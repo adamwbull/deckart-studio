@@ -5,17 +5,12 @@ from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError
 
+from deckart_studio.gemini.art_styles import general_instructions, instruction_for_style
 from deckart_studio.net import fetch_json
 from deckart_studio.settings import AppSettings
 
 GEMINI_GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 CARD_ASPECT_RATIO = "2:3"
-GENERAL_INSTRUCTIONS = (
-    "Create original Magic: The Gathering card illustration artwork only. "
-    "Portrait orientation matching a trading card (about 2:3). "
-    "Fill the frame with the scene. Do not include a card frame, title, mana cost, type line, "
-    "rules text, artist credit, set symbol, watermark, logo, UI, or border."
-)
 
 IMAGE_MODELS = {
     "nano-banana-2": {
@@ -47,13 +42,14 @@ def model_choices() -> list[tuple[str, str]]:
 
 
 def compose_art_prompt(style: str, user_prompt: str, card_name: str = "", type_line: str = "") -> str:
-    sections = [GENERAL_INSTRUCTIONS]
+    sections = [general_instructions()]
     if card_name.strip():
         sections.append(f"Card name: {card_name.strip()}.")
     if type_line.strip():
         sections.append(f"Type line: {type_line.strip()}.")
-    if style.strip():
-        sections.append(f"Art style: {style.strip()}.")
+    style_text = instruction_for_style(style)
+    if style_text:
+        sections.append(style_text)
     if user_prompt.strip():
         sections.append(user_prompt.strip())
     return " ".join(sections)

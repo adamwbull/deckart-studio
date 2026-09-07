@@ -8,7 +8,7 @@ This repository is the **application only**. Personal decks, generated art, and 
 
 - Import Moxfield decks and pasted lists (commanders, sideboard, tokens)
 - Card Maker with Clear Art, Full Art plates, textures, and custom display names
-- Gemini **Nano Banana 2** / **Nano Banana 2 Lite** art generation from a Google API key
+- Gemini **Nano Banana 2** / **Nano Banana 2 Lite** art generation, including a **Western Anime** style and full per-style illustration instructions
 - Generated images save to `DeckArt/generated_ai` immediately (AI Recommended gallery)
 - Publish local and Scryfall images to Steam Cloud for TTS
 - Auto-update from [GitHub Releases](https://github.com/adamwbull/deckart-studio/releases) (startup check on by default)
@@ -48,18 +48,20 @@ The MSI offers desktop shortcut and taskbar pin during setup. The zip is still r
 Push a version tag matching `APP_VERSION` in `deckart_studio/version.py`:
 
 ```bat
-git tag v0.6.9
-git push origin v0.6.9
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 GitHub Actions builds the zip and MSI and publishes a Release. Installed copies check that Release on startup (on by default) and can download/install it.
+
+To Authenticode-sign a local build (needed to clear the SmartScreen unknown-publisher warning), set `DECKART_SIGN_PFX` to an OV/EV or Azure Trusted Signing PFX and optionally `DECKART_SIGN_PASSWORD`. A self-signed certificate will not remove that warning.
 
 ## Gemini art
 
 1. Create an API key in [Google AI Studio](https://aistudio.google.com/apikey)
 2. Settings → Gemini API key
 3. Open Card Maker → right-hand **Gemini art** panel
-4. Pick Nano Banana 2 or Lite, an art style, and a prompt
-5. Generate. The PNG is written to your DeckArt `generated_ai` folder even if you do not save the card
+4. Pick Nano Banana 2 or Lite, an art style (Western Anime is the new default), and a prompt
+5. Generate. The PNG is written to your DeckArt `generated_ai` folder even if you do not save the card. Each style already carries full layout, lighting, and technique instructions.
 
 Not affiliated with Wizards of the Coast or Google. Card data from [Scryfall](https://scryfall.com).

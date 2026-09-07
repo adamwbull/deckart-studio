@@ -35,7 +35,7 @@ class AiArtPanel(QWidget):
         self._build()
 
     def _build(self) -> None:
-        self._prompt.setPlaceholderText("Describe the scene. This is added to the shared card-art instructions.")
+        self._prompt.setPlaceholderText("Describe the scene. The selected style already includes full illustration instructions.")
         self._prompt.setMinimumHeight(140)
         self._status.setWordWrap(True)
         self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter)

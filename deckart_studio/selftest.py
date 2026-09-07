@@ -119,6 +119,7 @@ class SelfTest:
         assert (self.settings.deck_art_root() / "README.txt").exists(), "DeckArt README not created"
         assert self.settings.generated_ai_folder().is_dir(), "generated_ai folder was not created"
         assert reloaded.art_styles, "default art styles were not saved"
+        assert "Western Anime" in reloaded.art_styles, reloaded.art_styles
         assert AppSettings.from_dict({}).check_for_updates is True, "startup update check must default on"
         assert reloaded.check_for_updates is True, "startup update check did not persist on"
         return reloaded.deck_art_folder
@@ -341,29 +342,39 @@ class SelfTest:
         return f"{count} plate textures, smooth + granite OK"
 
     def check_gemini_prompt(self) -> str:
+        from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles
         from deckart_studio.gemini.image_client import compose_art_prompt, first_image_from_response, slug_for
-        prompt = compose_art_prompt("Painterly oil", "Two Jennys on a rooftop", "Parallel Lives", "Enchantment")
-        assert "Parallel Lives" in prompt and "Painterly oil" in prompt and "Two Jennys" in prompt
-        assert "card frame" in prompt
+        western = compose_art_prompt("Western Anime", "Two Jennys on a rooftop", "Parallel Lives", "Enchantment")
+        oil = compose_art_prompt("Painterly oil", "Two Jennys on a rooftop", "Parallel Lives", "Enchantment")
+        custom = compose_art_prompt("My custom neon", "alley rain", "Sol Ring", "")
+        assert "Parallel Lives" in western and "Two Jennys" in western
+        assert "cel-shad" in western.lower() and "lower third" in western
+        assert "card frame" in western
+        assert "oil painting" in oil.lower() and "cel-shad" not in oil.lower()
+        assert "Art style: My custom neon." in custom
+        assert set(DEFAULT_ART_STYLES) == set(STYLE_INSTRUCTIONS)
+        assert all(len(text) > 280 for text in STYLE_INSTRUCTIONS.values())
+        merged = merge_default_art_styles(["Painterly oil", "My neon"])
+        assert merged[0] == "Western Anime" and "Painterly oil" in merged and merged[-1] == "My neon"
         assert slug_for("The Tenth Doctor") == "the-tenth-doctor"
         fake = {"candidates": [{"content": {"parts": [{"inlineData": {"data": "aGVsbG8=", "mimeType": "image/png"}}]}}]}
         data, mime = first_image_from_response(fake)
         assert data == b"hello" and mime == "image/png"
-        return "prompt + image payload parse"
+        return "western anime + per-style instructions"
 
     def check_update_versioning(self) -> str:
         from deckart_studio.updates import (
             is_msi_install, is_newer_version, release_msi_url, release_zip_url, version_tuple,
         )
-        assert version_tuple("0.6.9") > version_tuple("0.6.8")
-        assert is_newer_version("0.6.9", "0.6.8")
-        assert not is_newer_version("0.6.9", "0.6.9")
+        assert version_tuple("0.7.0") > version_tuple("0.6.9")
+        assert is_newer_version("0.7.0", "0.6.9")
+        assert not is_newer_version("0.7.0", "0.7.0")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.6.9-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.6.9-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.0-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.0-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.6.9").endswith("app.zip")
-        assert release_msi_url(assets, "0.6.9").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.0").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.0").endswith("app.msi")
         marker = self.workspace / "install_kind.txt"
         marker.write_text("msi", encoding="utf-8")
         assert is_msi_install(self.workspace)

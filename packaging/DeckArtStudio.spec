@@ -8,6 +8,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from deckart_studio.version import APP_VERSION  # noqa: E402
 
 ICON = str(PROJECT_ROOT / "packaging" / "deckart.ico")
+VERSION_INFO = PROJECT_ROOT / "packaging" / "file_version_info.txt"
+VERSION = str(VERSION_INFO) if VERSION_INFO.is_file() else None
 UNUSED_QT_MODULES = [
     "PySide6.QtQml", "PySide6.QtQuick", "PySide6.QtQuickWidgets", "PySide6.QtNetwork", "PySide6.QtOpenGL",
     "PySide6.QtOpenGLWidgets", "PySide6.QtSql", "PySide6.QtTest", "PySide6.QtXml", "PySide6.QtConcurrent",
@@ -35,7 +37,7 @@ windowed_exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     upx=False,
-    version=None,
+    version=VERSION,
 )
 console_exe = EXE(
     archive, analysis.scripts, [],
@@ -44,6 +46,7 @@ console_exe = EXE(
     icon=ICON,
     console=True,
     upx=False,
+    version=VERSION,
 )
 COLLECT(
     windowed_exe, console_exe,

@@ -9,6 +9,7 @@
     4. Runs the self-test again, this time inside the frozen EXE.
     5. Zips dist\DeckArtStudio into dist\DeckArtStudio-<version>-win64.zip.
     6. Builds dist\DeckArtStudio-<version>-win64.msi with Start Menu, desktop, and taskbar options.
+    7. Authenticode-signs the EXEs and MSI when DECKART_SIGN_PFX is set (a real code-signing cert).
 
 .PARAMETER Online
     Also exercise Scryfall in the self-tests (needs internet).
@@ -73,6 +74,47 @@ function Build-Icon {
     Step "Generating icon"
     & $Python -m deckart_studio.tools.make_icon (Join-Path $ProjectRoot "packaging\deckart.ico")
     if ($LASTEXITCODE -ne 0) { throw "Icon generation failed" }
+}
+
+function Build-VersionInfo {
+    Step "Writing Windows version resource"
+    & $Python -m deckart_studio.tools.make_version_info (Join-Path $ProjectRoot "packaging\file_version_info.txt")
+    if ($LASTEXITCODE -ne 0) { throw "Version resource generation failed" }
+}
+
+function Find-SignTool {
+    $kits = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+    if (-not (Test-Path $kits)) { return $null }
+    $found = Get-ChildItem $kits -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "\\x64\\signtool.exe$" } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+    if ($found) { return $found.FullName }
+    return $null
+}
+
+function Sign-File($path) {
+    $pfx = $env:DECKART_SIGN_PFX
+    if (-not $pfx) { return $false }
+    if (-not (Test-Path $pfx)) { throw "DECKART_SIGN_PFX does not exist: $pfx" }
+    $signtool = Find-SignTool
+    if (-not $signtool) { throw "signtool.exe was not found. Install the Windows 10/11 SDK." }
+    $timestamp = if ($env:DECKART_SIGN_TIMESTAMP) { $env:DECKART_SIGN_TIMESTAMP } else { "http://timestamp.digicert.com" }
+    $arguments = @("sign", "/fd", "SHA256", "/td", "SHA256", "/tr", $timestamp, "/f", $pfx)
+    if ($env:DECKART_SIGN_PASSWORD) { $arguments += @("/p", $env:DECKART_SIGN_PASSWORD) }
+    $arguments += $path
+    & $signtool @arguments
+    if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed for $path" }
+    return $true
+}
+
+function Sign-Release($version) {
+    if (-not $env:DECKART_SIGN_PFX) {
+        Write-Host "Skipping Authenticode signing (set DECKART_SIGN_PFX to a purchased OV/EV or Azure Trusted Signing cert to clear SmartScreen)." -ForegroundColor Yellow
+        return
+    }
+    Step "Authenticode signing MSI"
+    Sign-File (Join-Path $ProjectRoot "dist\DeckArtStudio-$version-win64.msi") | Out-Null
 }
 
 function Close-RunningApp {
@@ -175,11 +217,14 @@ try {
     Build-PlateTextures
     if (-not $SkipTests) { Run-SourceSelftest }
     Build-Icon
+    Build-VersionInfo
     Run-PyInstaller
     if (-not $SkipTests) { Run-FrozenSelftest }
     Copy-ReadMe
+    if ($env:DECKART_SIGN_PFX) { Sign-File (Join-Path $DistFolder "DeckArtStudio.exe") | Out-Null; Sign-File (Join-Path $DistFolder "DeckArtStudio-debug.exe") | Out-Null }
     Create-Zip $version
     Create-Msi $version
+    Sign-Release $version
     if ($Launch) { Start-Process (Join-Path $DistFolder "DeckArtStudio.exe") }
 }
 finally {

@@ -3,20 +3,11 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
 from deckart_studio.app_paths import data_directory, default_deck_art_root, default_saved_objects_folder
+from deckart_studio.gemini.art_styles import merge_default_art_styles
 
 AI_FOLDER_SUFFIX = "_ai"
 ORIGINAL_SUBFOLDER = "original"
 GENERATED_AI_FOLDER = "generated_ai"
-DEFAULT_ART_STYLES = [
-    "Photorealistic cinematic",
-    "Painterly oil",
-    "Dark fantasy illustration",
-    "Comic book ink",
-    "Watercolor",
-    "Anime",
-    "Retro pulp magazine",
-    "Stained glass",
-]
 DECK_ART_README = """DeckArt Studio gallery folder
 
 Drop image folders or files in here (or anywhere, then add them in the app's Gallery panel).
@@ -97,9 +88,8 @@ class AppSettings:
             self.deck_art_folder = str(default_deck_art_root())
         if not self.original_art_folder:
             self.original_art_folder = str(self.deck_art_root() / ORIGINAL_SUBFOLDER)
-        if not self.art_styles:
-            self.art_styles = list(DEFAULT_ART_STYLES)
-        if not self.last_art_style:
+        self.art_styles = merge_default_art_styles(self.art_styles)
+        if not self.last_art_style or self.last_art_style not in self.art_styles:
             self.last_art_style = self.art_styles[0]
         self.ensure_deck_art_root()
         self.add_gallery_folder(self.deck_art_root())

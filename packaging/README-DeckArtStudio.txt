@@ -47,7 +47,8 @@ FOLDERS (all changeable in Settings (folders)... on the toolbar)
                       DeckArt\rendered holds every card face the Card Maker produces.
                       DeckArt\generated_ai holds every Gemini image from Card Maker.
   Gemini API key      Settings. Used by the right-hand Gemini art panel in Card Maker
-                      (Nano Banana 2 or Nano Banana 2 Lite). Images save even if you
+                      (Nano Banana 2 or Nano Banana 2 Lite). Styles include Western Anime
+                      and other fully instructed looks. Images save even if you
                       do not click Save to deck.
   Updates             Toolbar "Check for updates…" and a startup check (on by default)
                       download newer Windows zips from GitHub Releases. MSI installs
