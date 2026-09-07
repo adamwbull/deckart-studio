@@ -7,7 +7,7 @@ This repository is the **application only**. Personal decks, generated art, and 
 ## Features
 
 - Import Moxfield decks and pasted lists (commanders, sideboard, tokens)
-- Card Maker with Clear Art, Full Art plates, textures, and custom display names
+- Card Maker with Clear Art, Full Art plates (photographic stone/paper/wood textures), and custom display names
 - Gemini **Nano Banana 2** / **Nano Banana 2 Lite** art generation, including a **Western Anime** style and full per-style illustration instructions
 - Generated images save to `DeckArt/generated_ai` immediately (AI Recommended gallery)
 - Publish local and Scryfall images to Steam Cloud for TTS
@@ -64,4 +64,4 @@ To Authenticode-sign a local build (needed to clear the SmartScreen unknown-publ
 4. Pick Nano Banana 2 or Lite, an art style (Western Anime is the new default), and a prompt
 5. Generate. The PNG is written to your DeckArt `generated_ai` folder even if you do not save the card. Each style already carries full layout, lighting, and technique instructions.
 
-Not affiliated with Wizards of the Coast or Google. Card data from [Scryfall](https://scryfall.com).
+Not affiliated with Wizards of the Coast or Google. Card data from [Scryfall](https://scryfall.com). Full Art plate materials are processed from [ambientCG](https://ambientcg.com) CC0 photographs.

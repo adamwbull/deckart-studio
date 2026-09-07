@@ -9,9 +9,14 @@ from deckart_studio.app_paths import resource_root
 TEXTURES_ROOT = resource_root() / "assets" / "cardmaker" / "textures"
 CATALOG_FILE = TEXTURES_ROOT / "textures.json"
 LEGACY_TEXTURE_IDS = {
-    "arcane": "frost",
+    "arcane": "alabaster",
+    "frost": "alabaster",
     "void": "slate",
     "colorless": "stone",
+    "linen": "plaster",
+    "ember": "leather",
+    "grove": "wood",
+    "gilded": "steel",
 }
 
 

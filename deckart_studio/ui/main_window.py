@@ -13,7 +13,7 @@ from deckart_studio.updates import (
     apply_downloaded_update, download_release_package, frozen_install_folder, is_newer_version,
     latest_release, should_check_for_updates, update_download_folder,
 )
-from deckart_studio.version import APP_VERSION
+from deckart_studio.version import APP_NAME, APP_VERSION
 from deckart_studio.ui.action_bar import ActionBar
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.birds_eye_tab import BirdsEyeTab
@@ -30,6 +30,15 @@ from deckart_studio.ui.settings_dialog import SettingsDialog
 from deckart_studio.ui.workers import run_in_background
 
 
+def window_title(deck_name: str = "", update_version: str = "") -> str:
+    parts = [f"{APP_NAME} {APP_VERSION}"]
+    if deck_name:
+        parts.append(deck_name)
+    if update_version:
+        parts.append(f"update {update_version} available")
+    return " — ".join(parts)
+
+
 class MainWindow(QMainWindow):
     """DeckArt Studio's shell: deck chooser toolbar, the three deck views, and the gallery dock."""
 
@@ -39,10 +48,11 @@ class MainWindow(QMainWindow):
         self._deck_combo = QComboBox()
         self._deck_paths: list[Path] = []
         self._dirty_label = QLabel()
+        self._available_update = ""
         self._action_bar = ActionBar()
         self._focus_tab = FocusTab(context)
         self._tabs = QTabWidget(self)
-        self.setWindowTitle("DeckArt Studio")
+        self._refresh_window_title()
         self.resize(1500, 950)
         self._build_toolbar()
         self._build_action_bar()
@@ -72,7 +82,7 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         self._artist_action = self._add_action(toolbar, "Set artist on all cards…", self._set_deck_artist)
         self._artist_action.setEnabled(False)
-        self._add_action(toolbar, "Settings (folders)…", self._open_settings)
+        self._add_action(toolbar, "Settings", self._open_settings)
         self._add_action(toolbar, "Check for updates…", self._check_for_updates)
         self._add_action(toolbar, "Open Saved Objects folder", self._open_saved_objects_folder)
         toolbar.addSeparator()
@@ -184,7 +194,7 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError) as error:
             QMessageBox.critical(self, "Could not open deck", f"{path}\n\n{error}")
         self._select_current_deck_in_combo()
-        self.setWindowTitle(f"DeckArt Studio — {path.name}")
+        self._refresh_window_title()
 
     def _on_deck_chosen(self, index: int) -> None:
         if 0 <= index < len(self._deck_paths):
@@ -227,6 +237,7 @@ class MainWindow(QMainWindow):
         if target:
             self.context.session.save_as(Path(target))
             self.refresh_deck_list()
+            self._refresh_window_title()
 
     def _open_settings(self) -> None:
         if SettingsDialog(self.context, self).exec():
@@ -240,10 +251,22 @@ class MainWindow(QMainWindow):
             owner=self,
         )
 
+    def _refresh_window_title(self) -> None:
+        document = self.context.session.document
+        deck_name = document.path.name if document is not None else ""
+        self.setWindowTitle(window_title(deck_name, self._available_update))
+
     def _on_update_release(self, release: object, silent: bool) -> None:
         if not is_newer_version(release.version):
+            self._available_update = ""
+            self._refresh_window_title()
             if not silent:
                 QMessageBox.information(self, "Up to date", f"You are on {APP_VERSION}.")
+            return
+        self._available_update = release.version
+        self._refresh_window_title()
+        if silent:
+            self.statusBar().showMessage(f"Update {release.version} available", 12000)
             return
         answer = QMessageBox.question(
             self,

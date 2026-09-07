@@ -40,7 +40,7 @@ CARD BACK
      Steam and Tabletop Simulator are auto-detected from your Steam libraries; if TTS lives somewhere
      unusual, point "Tabletop Simulator folder" at it in Settings. The Publish window shows what it found.
 
-FOLDERS (all changeable in Settings (folders)... on the toolbar)
+FOLDERS (all changeable in Settings on the toolbar)
   TTS Saved Objects   Auto-detected: Documents\My Games\Tabletop Simulator\Saves\Saved Objects
   DeckArt folder      Documents\DeckArt Studio\DeckArt  - drop your art here (or add other folders
                       in the Gallery panel). Sub-folders ending in _ai show under "AI Recommended".

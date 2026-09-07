@@ -11,6 +11,11 @@
       "sheet": "stone.png"
     },
     {
+      "id": "alabaster",
+      "label": "Alabaster",
+      "sheet": "alabaster.png"
+    },
+    {
       "id": "granite",
       "label": "Granite",
       "sheet": "granite.png"
@@ -21,9 +26,9 @@
       "sheet": "parchment.png"
     },
     {
-      "id": "linen",
-      "label": "Linen",
-      "sheet": "linen.png"
+      "id": "plaster",
+      "label": "Plaster",
+      "sheet": "plaster.png"
     },
     {
       "id": "slate",
@@ -31,24 +36,19 @@
       "sheet": "slate.png"
     },
     {
-      "id": "frost",
-      "label": "Frost",
-      "sheet": "frost.png"
+      "id": "wood",
+      "label": "Wood",
+      "sheet": "wood.png"
     },
     {
-      "id": "ember",
-      "label": "Ember",
-      "sheet": "ember.png"
+      "id": "leather",
+      "label": "Leather",
+      "sheet": "leather.png"
     },
     {
-      "id": "grove",
-      "label": "Grove",
-      "sheet": "grove.png"
-    },
-    {
-      "id": "gilded",
-      "label": "Gilded",
-      "sheet": "gilded.png"
+      "id": "steel",
+      "label": "Steel",
+      "sheet": "steel.png"
     }
   ]
 }

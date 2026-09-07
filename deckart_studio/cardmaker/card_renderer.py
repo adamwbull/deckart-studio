@@ -77,7 +77,7 @@ class CardRenderer:
     def _paint_frame(self, painter: QPainter, design: CardDesign, template: CardTemplate, canvas: QRect) -> None:
         color = template.color(design.color_id)
         if template.is_fullart():
-            self._paint_fullart_frame(painter, design, template)
+            self._paint_fullart_frame(painter, design)
         else:
             painter.drawImage(canvas, masked_frame(self.assets.image(color.frame), self.assets.image(template.frame_mask)))
         if design.is_legendary() and design.show_legendary_crown and template.legendary_supported and color.legendary:
@@ -86,14 +86,9 @@ class CardRenderer:
             box = template.layout.get("pt", {}).get("box", [571, 929, 137, 75])
             painter.drawImage(QRectF(*box), self.assets.image(color.pt_box))
 
-    def _paint_fullart_frame(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
-        source = self.assets.template("m15").color(design.color_id).frame
-        source_frame = self.assets.image(source)
-        if source_frame is None or source_frame.isNull():
-            return
+    def _paint_fullart_frame(self, painter: QPainter, design: CardDesign) -> None:
         paint_fullart_overlay(
             painter,
-            source_frame,
             self.assets.plate_textures,
             design.plate_texture_id,
             design.head_opacity,

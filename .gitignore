@@ -12,7 +12,6 @@ build/
 dist/
 packaging/deckart.ico
 packaging/file_version_info.txt
-deckart_studio/assets/cardmaker/textures/*.png
 .idea/
 .vscode/
 *.log

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtGui import QAction, QColor, QImage
 from PySide6.QtWidgets import QApplication
 
 from deckart_studio.app_paths import resource_root
@@ -265,6 +265,12 @@ class SelfTest:
         self.window.show()
         self._pump_events(0.5)
         assert self.context.session.has_deck(), "main window did not open the selftest deck"
+        title = self.window.windowTitle()
+        assert title.startswith(f"{APP_NAME} {APP_VERSION}"), title
+        assert self.context.session.document.path.name in title, title
+        settings_labels = [action.text() for action in self.window.findChildren(QAction)]
+        assert "Settings" in settings_labels
+        assert "Settings (folders)…" not in settings_labels
         return f"opened {self.context.session.document.path.name}"
 
     def check_session_stacks(self) -> str:
@@ -338,10 +344,12 @@ class SelfTest:
         assert not renderer.render(stone, EXPORT_SCALE).isNull(), "stone full art did not render"
         assert not renderer.render(granite, EXPORT_SCALE).isNull(), "granite full art did not render"
         assert self.assets.plate_textures.get("arcane").id == LEGACY_TEXTURE_IDS["arcane"]
-        assert self.assets.plate_textures.get("stone").sheet is not None
+        stone_sheet = self.assets.plate_textures.image(self.assets.plate_textures.get("stone").sheet)
+        assert stone_sheet is not None and not stone_sheet.isNull()
+        assert texture_grain(stone_sheet) > 2.5, "stone plate is a flat color, not a photograph"
         count = len(self.assets.plate_textures.list())
         assert count >= 8, count
-        return f"{count} aligned plate sheets, stone + granite OK"
+        return f"{count} photographic plate sheets, stone + granite OK"
 
     def check_gemini_prompt(self) -> str:
         from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles
@@ -365,24 +373,29 @@ class SelfTest:
         return "western anime + per-style instructions"
 
     def check_update_versioning(self) -> str:
+        from deckart_studio.ui.main_window import window_title
         from deckart_studio.updates import (
             is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
             version_tuple,
         )
-        assert version_tuple("0.7.1") > version_tuple("0.7.0")
-        assert is_newer_version("0.7.1", "0.6.9")
-        assert not is_newer_version("0.7.1", "0.7.1")
+        assert version_tuple("0.7.2") > version_tuple("0.7.1")
+        assert is_newer_version("0.7.2", "0.6.9")
+        assert not is_newer_version("0.7.2", "0.7.2")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.1-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.1-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.2-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.2-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.1").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.1").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.2").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.2").endswith("app.msi")
         assert update_download_folder().name == "DeckArtStudioUpdates"
         assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"
         marker.write_text("msi", encoding="utf-8")
         assert is_msi_install(self.workspace)
+        assert window_title() == f"{APP_NAME} {APP_VERSION}"
+        assert window_title("selftest.json", "0.8.0") == (
+            f"{APP_NAME} {APP_VERSION} — selftest.json — update 0.8.0 available"
+        )
         return "semver + zip/msi lookup"
 
     def check_gallery_ai_tab(self) -> str:
@@ -478,6 +491,21 @@ def assert_deck_objects_consistent(document: DeckDocument) -> None:
         state = board.container
         assert state["DeckIDs"] == [card.card_id for card in board.cards], (board.name, state["DeckIDs"])
         assert set(state["CustomDeck"]) == {str(card.sheet_id) for card in board.cards}, (board.name, state["CustomDeck"].keys())
+
+
+def texture_grain(image: QImage) -> float:
+    deltas = []
+    offset = 4
+    for y in range(0, image.height() - offset, 11):
+        for x in range(0, image.width() - offset, 11):
+            here = image.pixelColor(x, y)
+            neighbor = image.pixelColor(x + offset, y)
+            deltas.append(abs(_luminance(here) - _luminance(neighbor)))
+    return sum(deltas) / max(1, len(deltas))
+
+
+def _luminance(color: QColor) -> float:
+    return color.red() * 0.3 + color.green() * 0.59 + color.blue() * 0.11
 
 
 def sample_design(template_id: str, art_path: str) -> CardDesign:
