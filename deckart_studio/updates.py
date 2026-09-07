@@ -123,9 +123,20 @@ def download_release_package(release: AppRelease, destination_folder: Path, inst
     return download_file(release.zip_url, folder / f"DeckArtStudio-{release.version}-win64.zip")
 
 
+def updater_log_path() -> Path:
+    return Path(tempfile.gettempdir()) / "deckart_update.log"
+
+
+def updater_process_flags() -> int:
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if os.name == "nt":
+        flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+    return flags
+
+
 def apply_downloaded_update(package_path: Path, install_folder: Path, restart_pid: int) -> Path:
     script = updater_script_for(package_path, install_folder, restart_pid)
-    subprocess.Popen(["cmd", "/c", str(script)], creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+    subprocess.Popen(["cmd", "/c", str(script)], creationflags=updater_process_flags())
     return script
 
 
@@ -153,45 +164,63 @@ def extracted_app_folder(extract_root: Path) -> Path:
 
 
 def write_msi_updater_script(msi_path: Path, install_folder: Path, restart_pid: int) -> Path:
-    script = Path(tempfile.gettempdir()) / "deckart_apply_update.bat"
     exe = install_folder / "DeckArtStudio.exe"
-    script.write_text(
-        "\n".join([
-            "@echo off",
-            ":wait",
-            f'tasklist /FI "PID eq {restart_pid}" | find "{restart_pid}" >nul',
-            "if not errorlevel 1 (",
-            "  timeout /t 1 /nobreak >nul",
-            "  goto wait",
-            ")",
-            f'msiexec /i "{msi_path}" /qb /norestart',
-            f'start "" "{exe}"',
-            "",
-        ]),
-        encoding="utf-8",
-    )
-    return script
+    msi_log = Path(tempfile.gettempdir()) / "deckart_msiexec.log"
+    return write_batch_updater([
+        *wait_until_pid_exits(restart_pid),
+        log_line(f"install {msi_path}"),
+        powershell_msi_install(msi_path, msi_log),
+        "if errorlevel 1 (",
+        log_line("msiexec failed"),
+        "  exit /b 1",
+        ")",
+        log_line("relaunch"),
+        f'start "" "{exe}"',
+    ])
 
 
 def write_updater_script(source: Path, install_folder: Path, restart_pid: int) -> Path:
-    script = Path(tempfile.gettempdir()) / "deckart_apply_update.bat"
     exe = install_folder / "DeckArtStudio.exe"
-    script.write_text(
-        "\n".join([
-            "@echo off",
-            f":wait",
-            f'tasklist /FI "PID eq {restart_pid}" | find "{restart_pid}" >nul',
-            "if not errorlevel 1 (",
-            "  timeout /t 1 /nobreak >nul",
-            "  goto wait",
-            ")",
-            f'robocopy "{source}" "{install_folder}" /E /IS /IT /NFL /NDL /NJH /NJS /R:2 /W:1',
-            f'start "" "{exe}"',
-            "",
-        ]),
-        encoding="utf-8",
-    )
+    return write_batch_updater([
+        *wait_until_pid_exits(restart_pid),
+        log_line(f"copy {source} -> {install_folder}"),
+        f'robocopy "{source}" "{install_folder}" /E /IS /IT /NFL /NDL /NJH /NJS /R:2 /W:1',
+        log_line("relaunch"),
+        f'start "" "{exe}"',
+    ])
+
+
+def write_batch_updater(commands: list[str]) -> Path:
+    script = Path(tempfile.gettempdir()) / "deckart_apply_update.bat"
+    script.write_text("\n".join(["@echo off", *commands, ""]), encoding="utf-8")
     return script
+
+
+def wait_until_pid_exits(pid: int) -> list[str]:
+    return [
+        log_line(f"wait for pid {pid}"),
+        ":wait",
+        f'tasklist /FI "PID eq {pid}" | find "{pid}" >nul',
+        "if not errorlevel 1 (",
+        "  ping -n 2 127.0.0.1 >nul",
+        "  goto wait",
+        ")",
+        log_line(f"pid {pid} exited"),
+    ]
+
+
+def powershell_msi_install(msi_path: Path, msi_log: Path) -> str:
+    arguments = ",".join(
+        f"'{part}'" for part in ("/i", str(msi_path), "/qb", "/norestart", "/l*v", str(msi_log))
+    )
+    return (
+        'powershell -NoProfile -WindowStyle Hidden -Command '
+        f'"Start-Process msiexec -ArgumentList {arguments} -Verb RunAs -Wait"'
+    )
+
+
+def log_line(message: str) -> str:
+    return f'>>"{updater_log_path()}" echo {message}'
 
 
 def frozen_install_folder() -> Path | None:

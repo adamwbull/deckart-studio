@@ -4,6 +4,7 @@ Runs entirely against a temporary data folder, so it never touches the user's se
 """
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -376,17 +377,17 @@ class SelfTest:
         from deckart_studio.ui.main_window import window_title
         from deckart_studio.updates import (
             is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
-            version_tuple,
+            updater_process_flags, version_tuple, write_msi_updater_script,
         )
-        assert version_tuple("0.7.2") > version_tuple("0.7.1")
-        assert is_newer_version("0.7.2", "0.6.9")
-        assert not is_newer_version("0.7.2", "0.7.2")
+        assert version_tuple("0.7.3") > version_tuple("0.7.2")
+        assert is_newer_version("0.7.3", "0.6.9")
+        assert not is_newer_version("0.7.3", "0.7.3")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.2-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.2-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.3-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.3-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.2").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.2").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.3").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.3").endswith("app.msi")
         assert update_download_folder().name == "DeckArtStudioUpdates"
         assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"
@@ -396,6 +397,13 @@ class SelfTest:
         assert window_title("selftest.json", "0.8.0") == (
             f"{APP_NAME} {APP_VERSION} — selftest.json — update 0.8.0 available"
         )
+        script = write_msi_updater_script(Path("C:/tmp/DeckArtStudio.msi"), self.workspace, 4242)
+        bat = script.read_text(encoding="utf-8")
+        assert "timeout" not in bat
+        assert "ping -n 2 127.0.0.1" in bat
+        assert "Start-Process msiexec" in bat
+        assert "4242" in bat
+        assert updater_process_flags() & subprocess.DETACHED_PROCESS == 0
         return "semver + zip/msi lookup"
 
     def check_gallery_ai_tab(self) -> str:

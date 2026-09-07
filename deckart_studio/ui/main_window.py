@@ -5,7 +5,8 @@ from PySide6.QtCore import QByteArray, QTimer, Qt
 from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox, QTabWidget, QToolBar, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox, QTabWidget,
+    QToolBar, QVBoxLayout, QWidget,
 )
 
 from deckart_studio.tts.saved_objects import discover_deck_files
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
         self._deck_paths: list[Path] = []
         self._dirty_label = QLabel()
         self._available_update = ""
+        self._installing_update = False
         self._action_bar = ActionBar()
         self._focus_tab = FocusTab(context)
         self._tabs = QTabWidget(self)
@@ -293,9 +295,10 @@ class MainWindow(QMainWindow):
 
     def _install_update(self, package_path: object, install_folder) -> None:
         from pathlib import Path
+        self._installing_update = True
         apply_downloaded_update(Path(package_path), install_folder, os.getpid())
         QMessageBox.information(self, "Installing update", "DeckArt Studio will close and reopen on the new version.")
-        self.close()
+        QApplication.instance().quit()
 
     def _on_update_check_failed(self, error: str, silent: bool) -> None:
         if silent:
@@ -325,7 +328,7 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(QByteArray.fromHex(geometry_hex.encode("ascii")))
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        if not self._confirm_discard_changes():
+        if not self._installing_update and not self._confirm_discard_changes():
             event.ignore()
             return
         self.context.settings.window_geometry_hex = bytes(self.saveGeometry().toHex()).decode("ascii")
