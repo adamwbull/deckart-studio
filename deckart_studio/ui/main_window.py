@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from deckart_studio.tts.saved_objects import discover_deck_files
 from deckart_studio.updates import (
     apply_downloaded_update, download_release_package, frozen_install_folder, is_newer_version,
-    latest_release, should_check_for_updates, update_download_folder,
+    latest_release, should_auto_apply_update, should_check_for_updates, update_download_folder,
 )
 from deckart_studio.version import APP_NAME, APP_VERSION
 from deckart_studio.ui.action_bar import ActionBar
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self._artist_action = self._add_action(toolbar, "Set artist on all cards…", self._set_deck_artist)
         self._artist_action.setEnabled(False)
         self._add_action(toolbar, "Settings", self._open_settings)
-        self._add_action(toolbar, "Check for updates…", self._check_for_updates)
+        self._add_action(toolbar, "Check for updates now", self._check_for_updates)
         self._add_action(toolbar, "Open Saved Objects folder", self._open_saved_objects_folder)
         toolbar.addSeparator()
         toolbar.addWidget(self._dirty_label)
@@ -106,7 +106,7 @@ class MainWindow(QMainWindow):
         self._action_bar.add_step(2, "Edit current card (Card Maker)…", self._design_current_card,
                                   "Swap the art and re-render the selected card as a custom face")
         self._action_bar.add_step(3, "Make deck single art…", self._restyle_deck,
-                                  "Pick Full Art, Clear Art, or another frame and rebuild every card")
+                                  "Pick a frame. Full Art also lets you choose a plate style or custom PNG bars.")
         self._action_bar.add_step(4, "Save deck", self._save, "Write the deck JSON back into Saved Objects")
         self._action_bar.add_step(5, "Publish to Steam Cloud…", self._publish_deck,
                                   "Upload local images to Steam Cloud so everyone in your TTS game sees them, then save")
@@ -267,24 +267,30 @@ class MainWindow(QMainWindow):
             return
         self._available_update = release.version
         self._refresh_window_title()
+        install_folder = frozen_install_folder()
+        if should_auto_apply_update(silent, install_folder):
+            self._download_and_install(release, install_folder)
+            return
         if silent:
             self.statusBar().showMessage(f"Update {release.version} available", 12000)
+            return
+        if install_folder is None:
+            QMessageBox.information(
+                self,
+                "Update available",
+                f"DeckArt Studio {release.version} is on GitHub (you have {APP_VERSION}).\n\n"
+                f"This copy is running from source. Download the release from:\n{release.html_url}",
+            )
             return
         answer = QMessageBox.question(
             self,
             "Update available",
             f"DeckArt Studio {release.version} is on GitHub (you have {APP_VERSION}).\n\nDownload and install it now?",
         )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        install_folder = frozen_install_folder()
-        if install_folder is None:
-            QMessageBox.information(
-                self,
-                "Update downloaded from source",
-                f"This copy is running from source. Download the release zip from:\n{release.html_url}",
-            )
-            return
+        if answer == QMessageBox.StandardButton.Yes:
+            self._download_and_install(release, install_folder)
+
+    def _download_and_install(self, release: object, install_folder) -> None:
         self.statusBar().showMessage(f"Downloading {release.version}…", 8000)
         run_in_background(
             lambda report: download_release_package(release, update_download_folder(), install_folder),

@@ -8,7 +8,7 @@ from deckart_studio.cardmaker.asset_library import CardAssetLibrary
 from deckart_studio.cardmaker.card_design import design_from_scryfall
 from deckart_studio.cardmaker.card_lookup import CardLookup
 from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, CardRenderer
-from deckart_studio.cardmaker.deck_batch import BatchCard, DeckFaceBatch
+from deckart_studio.cardmaker.deck_batch import BatchCard, BatchOptions, DeckFaceBatch
 from deckart_studio.cardmaker.design_store import DesignStore
 from deckart_studio.cardmaker.token_lookup import lookup_token_card
 from deckart_studio.gallery.gallery_library import GalleryLibrary
@@ -65,7 +65,7 @@ def sync_gemini_deck(deck_path: Path, gemini_folder: Path, template_id: str = DE
     store = DesignStore(settings.deck_art_root())
     batch = DeckFaceBatch(CardLookup(ScryfallClient()), CardRenderer(assets), store, GalleryLibrary(settings))
     report(f"Rendering {len(batch_cards)} Clear Art faces from {len(matches)} gemini images…")
-    rendered = batch.run(batch_cards, template_id, artist, report)
+    rendered = batch.run(batch_cards, BatchOptions(template_id=template_id, artist=artist), report)
 
     for face in rendered:
         board = boards[face.board_index]

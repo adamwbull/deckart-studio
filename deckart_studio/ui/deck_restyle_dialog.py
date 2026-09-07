@@ -4,29 +4,31 @@ from PySide6.QtWidgets import (
 )
 
 from deckart_studio.cardmaker.card_design import DEFAULT_TEMPLATE_ID
-from deckart_studio.cardmaker.deck_batch import BatchCard, DeckFaceBatch, RenderedFace
+from deckart_studio.cardmaker.deck_batch import BatchCard, BatchOptions, DeckFaceBatch, RenderedFace
 from deckart_studio.image_source import ImageSource
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.deck_session import DeckSession
+from deckart_studio.ui.fullart_chrome_panel import FullArtChromePanel
 from deckart_studio.ui.styles import PRIMARY_BUTTON_STYLE
 from deckart_studio.ui.workers import run_in_background
 
 
 class DeckRestyleDialog(QDialog):
-    """Rebuild every card in the open deck: one chosen frame, and/or one artist credit."""
+    """Rebuild every card in the open deck: one chosen frame, Full Art chrome, and/or one artist credit."""
 
     def __init__(self, context: AppContext, parent: QWidget | None = None, artist_only: bool = False):
         super().__init__(parent)
         self.context = context
         self._artist_only = artist_only
         self._template = QComboBox()
+        self._chrome = FullArtChromePanel(context.card_assets.plate_textures)
         self._artist = QLineEdit()
         self._progress = QProgressBar()
         self._status = QLabel()
         self._start_button = QPushButton(self._start_label())
         self._close_button = QPushButton("Cancel")
         self.setWindowTitle(self._window_title())
-        self.resize(560, 280)
+        self.resize(620, 280 if artist_only else 520)
         self._build()
 
     def _window_title(self) -> str:
@@ -47,6 +49,8 @@ class DeckRestyleDialog(QDialog):
         self._start_button.setDefault(True)
         self._start_button.clicked.connect(self._start)
         self._close_button.clicked.connect(self.reject)
+        self._template.currentIndexChanged.connect(self._refresh_chrome)
+        self._refresh_chrome()
         layout = QVBoxLayout(self)
         layout.addWidget(self._explanation())
         layout.addLayout(self._form())
@@ -68,6 +72,7 @@ class DeckRestyleDialog(QDialog):
                     "then every face will be re-rendered in its current frame.")
         else:
             text = (f"All {count} cards across {stacks} stack(s) will be rebuilt in the frame you pick. "
+                    "Full Art can use a built-in plate style or custom PNG bars. "
                     "Name, cost, type, rules and P/T come from Scryfall (or the deck's own text). "
                     "Art you already picked from the gallery is kept; otherwise the card's original artwork is used.")
         label = QLabel(text)
@@ -78,8 +83,16 @@ class DeckRestyleDialog(QDialog):
         form = QFormLayout()
         if not self._artist_only:
             form.addRow("Frame", self._template)
+            form.addRow(self._chrome)
         form.addRow("Artist credit", self._artist)
         return form
+
+    def _refresh_chrome(self) -> None:
+        if self._artist_only:
+            self._chrome.hide()
+            return
+        template = self.context.card_assets.template(self._template.currentData())
+        self._chrome.setVisible(template.is_fullart())
 
     def _button_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -98,15 +111,34 @@ class DeckRestyleDialog(QDialog):
             self._status.setText("This deck has no cards.")
             return
         remember_artist(self.context, artist)
-        template_id = None if self._artist_only else self._template.currentData()
         batch = self.context.deck_face_batch()
         self._set_busy(True)
-        run_in_background(lambda report: batch.run(cards, template_id, artist or None, report),
+        run_in_background(lambda report: batch.run(cards, self._options(artist), report),
                           self._on_rendered, self._on_failed, self._status.setText, owner=self)
+
+    def _options(self, artist: str) -> BatchOptions:
+        if self._artist_only:
+            return BatchOptions(artist=artist or None)
+        template_id = self._template.currentData()
+        template = self.context.card_assets.template(template_id)
+        options = BatchOptions(template_id=template_id, artist=artist or None,
+                               apply_fullart_chrome=template.is_fullart())
+        if not options.apply_fullart_chrome:
+            return options
+        options.plate_style_id = self._chrome.plate_style_id()
+        options.plate_texture_id = self._chrome.plate_texture_id()
+        options.chrome_mode = self._chrome.chrome_mode()
+        options.title_piece_path = self._chrome.piece_path("title")
+        options.subtitle_piece_path = self._chrome.piece_path("subtitle")
+        options.type_piece_path = self._chrome.piece_path("type")
+        options.text_piece_path = self._chrome.piece_path("text")
+        options.opacity = self._chrome.opacity()
+        return options
 
     def _set_busy(self, busy: bool) -> None:
         self._start_button.setEnabled(not busy)
         self._template.setEnabled(not busy)
+        self._chrome.set_enabled(not busy)
         self._artist.setEnabled(not busy)
         self._close_button.setEnabled(not busy)
         self._progress.setVisible(busy)

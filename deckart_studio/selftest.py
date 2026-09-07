@@ -470,18 +470,21 @@ class SelfTest:
     def check_update_versioning(self) -> str:
         from deckart_studio.ui.main_window import window_title
         from deckart_studio.updates import (
-            is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
-            updater_process_flags, version_tuple, write_msi_updater_script,
+            is_msi_install, is_newer_version, release_msi_url, release_zip_url, should_auto_apply_update,
+            update_download_folder, updater_process_flags, version_tuple, write_msi_updater_script,
         )
-        assert version_tuple("0.7.5") > version_tuple("0.7.4")
-        assert is_newer_version("0.7.5", "0.6.9")
-        assert not is_newer_version("0.7.5", "0.7.5")
+        assert version_tuple("0.7.6") > version_tuple("0.7.5")
+        assert is_newer_version("0.7.6", "0.6.9")
+        assert not is_newer_version("0.7.6", "0.7.6")
+        assert should_auto_apply_update(True, Path("C:/Program Files/DeckArtStudio"))
+        assert not should_auto_apply_update(True, None)
+        assert not should_auto_apply_update(False, Path("C:/Program Files/DeckArtStudio"))
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.5-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.5-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.6-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.6-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.5").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.5").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.6").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.6").endswith("app.msi")
         assert update_download_folder().name == "DeckArtStudioUpdates"
         assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"
@@ -532,16 +535,22 @@ class SelfTest:
         return "Soldier token resolves to Soldier face, not Goblin"
 
     def check_batch_artist_override(self) -> str:
-        from deckart_studio.cardmaker.deck_batch import BatchCard
+        from deckart_studio.cardmaker.deck_batch import BatchCard, BatchOptions
         batch = self.context.deck_face_batch()
         card = BatchCard(0, 0, "Selftest Wizard", "Creature\nDoes things.", None, "selftest")
-        forced = batch._design_for(card, None, "clearart", "paidforwinrar")
+        forced = batch._design_for(card, None, BatchOptions(template_id="clearart", artist="paidforwinrar"))
         assert forced.artist == "paidforwinrar", forced.artist
         assert forced.template_id == "clearart", forced.template_id
-        kept = batch._design_for(card, None, None, "Ada")
+        kept = batch._design_for(card, None, BatchOptions(artist="Ada"))
         assert kept.artist == "Ada", kept.artist
         assert kept.template_id == "fullart", kept.template_id
-        return "artist override and keep-template fallback"
+        chrome = batch._design_for(card, None, BatchOptions(
+            template_id="fullart", apply_fullart_chrome=True, plate_style_id="arch",
+            chrome_mode="pieces", title_piece_path="title.png",
+        ))
+        assert chrome.plate_style_id == "arch" and chrome.chrome_mode == "pieces", chrome.plate_style_id
+        assert chrome.title_piece_path == "title.png"
+        return "artist override, keep-template fallback, and Full Art chrome"
 
     def check_dialogs_construct(self) -> str:
         from deckart_studio.ui.add_card_dialog import AddCardDialog

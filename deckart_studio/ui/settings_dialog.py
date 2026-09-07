@@ -27,7 +27,7 @@ class SettingsDialog(QDialog):
         self._gemini_key.setEchoMode(QLineEdit.EchoMode.Password)
         self._gemini_key.setPlaceholderText("Paste a Google AI Studio / Gemini API key")
         self._show_key = QCheckBox("Show key")
-        self._check_updates = QCheckBox("Check GitHub Releases for updates on startup")
+        self._check_updates = QCheckBox("Automatically install updates when the app starts")
         self.setWindowTitle("Settings")
         self.resize(820, 460)
         self._build()

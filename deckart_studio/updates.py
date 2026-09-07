@@ -48,6 +48,10 @@ def should_check_for_updates() -> bool:
     return bool(GITHUB_REPOSITORY)
 
 
+def should_auto_apply_update(silent: bool, install_folder: Path | None) -> bool:
+    return bool(silent and install_folder is not None)
+
+
 def latest_release(repository: str = GITHUB_REPOSITORY) -> AppRelease:
     if not repository:
         raise UpdateError("No GitHub repository is configured for updates.")

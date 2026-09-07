@@ -35,6 +35,21 @@ class RenderedFace:
     path: Path
 
 
+@dataclass
+class BatchOptions:
+    template_id: str | None = None
+    artist: str | None = None
+    apply_fullart_chrome: bool = False
+    plate_style_id: str = "bars"
+    plate_texture_id: str = "stone"
+    chrome_mode: str = "style"
+    title_piece_path: str = ""
+    subtitle_piece_path: str = ""
+    type_piece_path: str = ""
+    text_piece_path: str = ""
+    opacity: float = 0.92
+
+
 class DeckFaceBatch:
     """Re-renders every card of a deck, optionally forcing one template and/or one artist credit."""
 
@@ -50,15 +65,14 @@ class DeckFaceBatch:
         return [BatchCard(board_index, card.index, card.nickname, card.description,
                           face_source(card).local_path, scope_name) for card in cards]
 
-    def run(self, cards: list[BatchCard], template_id: str | None, artist: str | None,
-            report: ProgressCallback) -> list[RenderedFace]:
+    def run(self, cards: list[BatchCard], options: BatchOptions, report: ProgressCallback) -> list[RenderedFace]:
         report(f"Looking up {len(cards)} cards on Scryfall…")
         scryfall_cards = self._lookup_cards(cards)
         rendered: list[RenderedFace] = []
         for position, card in enumerate(cards, start=1):
             report(f"Rendering {position}/{len(cards)}: {card.nickname}")
             scryfall = scryfall_cards.get(card.nickname)
-            rendered.append(self._render_card(card, scryfall, template_id, artist))
+            rendered.append(self._render_card(card, scryfall, options))
         return rendered
 
     def _lookup_cards(self, cards: list[BatchCard]) -> dict[str, dict]:
@@ -77,18 +91,16 @@ class DeckFaceBatch:
                 found[card.nickname] = match
         return found
 
-    def _render_card(self, card: BatchCard, scryfall_card: dict | None, template_id: str | None,
-                     artist: str | None) -> RenderedFace:
-        design = self._design_for(card, scryfall_card, template_id, artist)
+    def _render_card(self, card: BatchCard, scryfall_card: dict | None, options: BatchOptions) -> RenderedFace:
+        design = self._design_for(card, scryfall_card, options)
         render_path = self.store.render_path(card.scope_name, card.index, design.name or card.nickname)
         render_path.parent.mkdir(parents=True, exist_ok=True)
         self.renderer.render(design, EXPORT_SCALE).save(str(render_path), "PNG")
         self.store.save(design, render_path)
         return RenderedFace(card.board_index, card.index, render_path)
 
-    def _design_for(self, card: BatchCard, scryfall_card: dict | None, template_id: str | None,
-                    artist: str | None) -> CardDesign:
-        fallback = template_id or DEFAULT_TEMPLATE_ID
+    def _design_for(self, card: BatchCard, scryfall_card: dict | None, options: BatchOptions) -> CardDesign:
+        fallback = options.template_id or DEFAULT_TEMPLATE_ID
         stored = self.store.load_design_for_face(card.face_local_path)
         if scryfall_card is not None:
             design = design_from_scryfall(scryfall_card, fallback)
@@ -98,10 +110,7 @@ class DeckFaceBatch:
                 design.art_offset_y = stored.art_offset_y
         else:
             design = stored or self._fresh_design(card, scryfall_card, fallback)
-        if template_id:
-            design.template_id = template_id
-        if artist:
-            design.artist = artist
+        apply_batch_options(design, options)
         design.art_path = self._art_for(card, design, scryfall_card)
         return design
 
@@ -122,3 +131,21 @@ class DeckFaceBatch:
             return design.art_path
         crop = self.lookup.art_crop_path(scryfall_card) if scryfall_card else None
         return str(crop) if crop else ""
+
+
+def apply_batch_options(design: CardDesign, options: BatchOptions) -> None:
+    if options.template_id:
+        design.template_id = options.template_id
+    if options.artist:
+        design.artist = options.artist
+    if not options.apply_fullart_chrome:
+        return
+    design.plate_style_id = options.plate_style_id
+    design.plate_texture_id = options.plate_texture_id
+    design.chrome_mode = options.chrome_mode
+    design.title_piece_path = options.title_piece_path
+    design.subtitle_piece_path = options.subtitle_piece_path
+    design.type_piece_path = options.type_piece_path
+    design.text_piece_path = options.text_piece_path
+    design.head_opacity = options.opacity
+    design.body_opacity = options.opacity
