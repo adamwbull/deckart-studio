@@ -1,0 +1,26 @@
+.tools/
+.venv/
+.deckart_studio/
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+packaging/deckart.ico
+.idea/
+.vscode/
+*.log
+
+# Local user data and personal decks — this repo is the app only
+DeckArt/
+dicethrone/
+*.txt
+!requirements.txt
+!requirements-build.txt
+!packaging/README-DeckArtStudio.txt
+!LICENSE
+!README.md

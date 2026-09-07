@@ -1,0 +1,163 @@
+{
+  "id": "8th",
+  "name": "Vintage (8th Edition)",
+  "canvas": [
+    749,
+    1044
+  ],
+  "frame_mask": "frameMask.png",
+  "colors": {
+    "white": {
+      "label": "White",
+      "frame": "white/frame.png",
+      "pt": "white/pt.png"
+    },
+    "whiteLand": {
+      "label": "White Land",
+      "frame": "whiteLand/frame.png",
+      "pt": "whiteLand/pt.png"
+    },
+    "blue": {
+      "label": "Blue",
+      "frame": "blue/frame.png",
+      "pt": "blue/pt.png"
+    },
+    "blueLand": {
+      "label": "Blue Land",
+      "frame": "blueLand/frame.png",
+      "pt": "blueLand/pt.png"
+    },
+    "black": {
+      "label": "Black",
+      "frame": "black/frame.png",
+      "pt": "black/pt.png"
+    },
+    "blackLand": {
+      "label": "Black Land",
+      "frame": "blackLand/frame.png",
+      "pt": "blackLand/pt.png"
+    },
+    "red": {
+      "label": "Red",
+      "frame": "red/frame.png",
+      "pt": "red/pt.png"
+    },
+    "redLand": {
+      "label": "Red Land",
+      "frame": "redLand/frame.png",
+      "pt": "redLand/pt.png"
+    },
+    "green": {
+      "label": "Green",
+      "frame": "green/frame.png",
+      "pt": "green/pt.png"
+    },
+    "greenLand": {
+      "label": "Green Land",
+      "frame": "greenLand/frame.png",
+      "pt": "greenLand/pt.png"
+    },
+    "gold": {
+      "label": "Gold",
+      "frame": "gold/frame.png",
+      "pt": "gold/pt.png"
+    },
+    "goldLand": {
+      "label": "Gold Land",
+      "frame": "goldLand/frame.png",
+      "pt": "goldLand/pt.png"
+    },
+    "colorless": {
+      "label": "Colorless",
+      "frame": "colorless/frame.png",
+      "pt": "colorless/pt.png"
+    },
+    "colorlessLand": {
+      "label": "Colorless Land",
+      "frame": "colorlessLand/frame.png",
+      "pt": "colorlessLand/pt.png"
+    },
+    "artifact": {
+      "label": "Artifact",
+      "frame": "artifact/frame.png",
+      "pt": "artifact/pt.png"
+    },
+    "oldArtifact": {
+      "label": "Old Artifact",
+      "frame": "oldArtifact/frame.png",
+      "pt": "oldArtifact/pt.png"
+    },
+    "oldGold": {
+      "label": "Old Gold",
+      "frame": "oldGold/frame.png",
+      "pt": "oldGold/pt.png"
+    },
+    "oldGoldLand": {
+      "label": "Old Gold Land",
+      "frame": "oldGoldLand/frame.png",
+      "pt": "oldGoldLand/pt.png"
+    }
+  },
+  "layout": {
+    "title": {
+      "x": 66,
+      "y": 62,
+      "font": "Matrix Bold",
+      "size": 44,
+      "spacing": 0.5
+    },
+    "mana": {
+      "right_x": 685,
+      "y": 68,
+      "radius": 16.5,
+      "step": 39
+    },
+    "type": {
+      "x": 74,
+      "y": 598,
+      "font": "Matrix Bold",
+      "size": 37.5,
+      "spacing": 0.0
+    },
+    "text": {
+      "x": 76,
+      "y": 650,
+      "width": 604,
+      "height": 268,
+      "font": "MPlantin",
+      "max_size": 31,
+      "min_size": 17
+    },
+    "pt": {
+      "box": [
+        541,
+        920.5,
+        162,
+        84
+      ],
+      "text_center_x": 626,
+      "text_y": 936,
+      "font": "Matrix Bold",
+      "size": 48
+    },
+    "artist": {
+      "x": 116,
+      "y": 956,
+      "font": "Matrix Bold",
+      "size": 25,
+      "color": "white",
+      "brush": [
+        88,
+        962
+      ]
+    },
+    "legal": {
+      "x": 62,
+      "y": 987,
+      "font": "MPlantin",
+      "size": 16,
+      "color": "white"
+    }
+  },
+  "legendary_supported": false
+}

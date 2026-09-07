@@ -1,0 +1,140 @@
+{
+  "id": "clearart",
+  "name": "Clear Art",
+  "style": "clear",
+  "canvas": [
+    749,
+    1044
+  ],
+  "frame_mask": null,
+  "art_window": [
+    0,
+    0,
+    749,
+    1044
+  ],
+  "colors": {
+    "white": {
+      "label": "White",
+      "frame": "frame.png"
+    },
+    "whiteLand": {
+      "label": "White Land",
+      "frame": "frame.png"
+    },
+    "blue": {
+      "label": "Blue",
+      "frame": "frame.png"
+    },
+    "blueLand": {
+      "label": "Blue Land",
+      "frame": "frame.png"
+    },
+    "black": {
+      "label": "Black",
+      "frame": "frame.png"
+    },
+    "blackLand": {
+      "label": "Black Land",
+      "frame": "frame.png"
+    },
+    "red": {
+      "label": "Red",
+      "frame": "frame.png"
+    },
+    "redLand": {
+      "label": "Red Land",
+      "frame": "frame.png"
+    },
+    "green": {
+      "label": "Green",
+      "frame": "frame.png"
+    },
+    "greenLand": {
+      "label": "Green Land",
+      "frame": "frame.png"
+    },
+    "gold": {
+      "label": "Gold",
+      "frame": "frame.png"
+    },
+    "goldLand": {
+      "label": "Gold Land",
+      "frame": "frame.png"
+    },
+    "colorless": {
+      "label": "Colorless",
+      "frame": "frame.png"
+    },
+    "colorlessLand": {
+      "label": "Colorless Land",
+      "frame": "frame.png"
+    },
+    "artifact": {
+      "label": "Artifact",
+      "frame": "frame.png"
+    },
+    "vehicle": {
+      "label": "Vehicle",
+      "frame": "frame.png"
+    }
+  },
+  "layout": {
+    "title": {
+      "x": 48,
+      "y": 42,
+      "font": "Beleren Bold",
+      "size": 40,
+      "spacing": 0.15
+    },
+    "mana": {
+      "right_x": 701,
+      "y": 44,
+      "radius": 17.5,
+      "step": 31
+    },
+    "type": {
+      "x": 48,
+      "y": 638,
+      "font": "Beleren Bold",
+      "size": 28,
+      "spacing": 0.05
+    },
+    "text": {
+      "x": 48,
+      "y": 688,
+      "width": 653,
+      "height": 248,
+      "font": "MPlantin",
+      "max_size": 30,
+      "min_size": 16
+    },
+    "pt": {
+      "box": [
+        575,
+        924,
+        137,
+        75
+      ],
+      "text_center_x": 680,
+      "text_y": 948,
+      "font": "Beleren Bold",
+      "size": 42
+    },
+    "artist": {
+      "x": 48,
+      "y": 992,
+      "font": "Matrix Bold Small Caps",
+      "size": 22,
+      "color": "white"
+    },
+    "legal": {
+      "x": 48,
+      "y": 1014,
+      "font": "MPlantin",
+      "size": 16,
+      "color": "white"
+    }
+  },
+  "legendary_supported": false
+}

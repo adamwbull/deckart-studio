@@ -1,0 +1,58 @@
+{
+  "textures": [
+    {
+      "id": "smooth",
+      "label": "Smooth gradient",
+      "head": null,
+      "body": null
+    },
+    {
+      "id": "granite",
+      "label": "Granite",
+      "head": "granite-head.png",
+      "body": "granite-body.png"
+    },
+    {
+      "id": "linen",
+      "label": "White linen",
+      "head": "linen-head.png",
+      "body": "linen-body.png"
+    },
+    {
+      "id": "arcane",
+      "label": "Arcane blue",
+      "head": "arcane-head.png",
+      "body": "arcane-body.png"
+    },
+    {
+      "id": "void",
+      "label": "Void black",
+      "head": "void-head.png",
+      "body": "void-body.png"
+    },
+    {
+      "id": "ember",
+      "label": "Ember red",
+      "head": "ember-head.png",
+      "body": "ember-body.png"
+    },
+    {
+      "id": "grove",
+      "label": "Grove green",
+      "head": "grove-head.png",
+      "body": "grove-body.png"
+    },
+    {
+      "id": "gilded",
+      "label": "Gilded gold",
+      "head": "gilded-head.png",
+      "body": "gilded-body.png"
+    },
+    {
+      "id": "colorless",
+      "label": "Colorless steel",
+      "head": "colorless-head.png",
+      "body": "colorless-body.png"
+    }
+  ]
+}

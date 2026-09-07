@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File packaging/build_exe.ps1
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path deckart_studio/version.py -Pattern 'APP_VERSION = "([^"]+)"').Matches[0].Groups[1].Value
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $zip = "dist/DeckArtStudio-$version-win64.zip"
+          if (-not (Test-Path $zip)) { throw "Missing $zip" }
+          $tag = "v$version"
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag $zip --clobber
+          } else {
+            gh release create $tag $zip --title "DeckArt Studio $version" --generate-notes
+          }

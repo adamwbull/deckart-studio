@@ -1,0 +1,169 @@
+{
+  "id": "m15",
+  "name": "Modern (M15)",
+  "canvas": [
+    749,
+    1044
+  ],
+  "frame_mask": "frameMask.png",
+  "colors": {
+    "white": {
+      "label": "White",
+      "frame": "white/frame.png",
+      "pt": "white/pt.png",
+      "legendary": "white/legendary.png"
+    },
+    "whiteLand": {
+      "label": "White Land",
+      "frame": "whiteLand/frame.png",
+      "pt": "whiteLand/pt.png",
+      "legendary": "whiteLand/legendary.png"
+    },
+    "blue": {
+      "label": "Blue",
+      "frame": "blue/frame.png",
+      "pt": "blue/pt.png",
+      "legendary": "blue/legendary.png"
+    },
+    "blueLand": {
+      "label": "Blue Land",
+      "frame": "blueLand/frame.png",
+      "pt": "blueLand/pt.png",
+      "legendary": "blueLand/legendary.png"
+    },
+    "black": {
+      "label": "Black",
+      "frame": "black/frame.png",
+      "pt": "black/pt.png",
+      "legendary": "black/legendary.png"
+    },
+    "blackLand": {
+      "label": "Black Land",
+      "frame": "blackLand/frame.png",
+      "pt": "blackLand/pt.png",
+      "legendary": "blackLand/legendary.png"
+    },
+    "red": {
+      "label": "Red",
+      "frame": "red/frame.png",
+      "pt": "red/pt.png",
+      "legendary": "red/legendary.png"
+    },
+    "redLand": {
+      "label": "Red Land",
+      "frame": "redLand/frame.png",
+      "pt": "redLand/pt.png",
+      "legendary": "redLand/legendary.png"
+    },
+    "green": {
+      "label": "Green",
+      "frame": "green/frame.png",
+      "pt": "green/pt.png",
+      "legendary": "green/legendary.png"
+    },
+    "greenLand": {
+      "label": "Green Land",
+      "frame": "greenLand/frame.png",
+      "pt": "greenLand/pt.png",
+      "legendary": "greenLand/legendary.png"
+    },
+    "gold": {
+      "label": "Gold",
+      "frame": "gold/frame.png",
+      "pt": "gold/pt.png",
+      "legendary": "gold/legendary.png"
+    },
+    "goldLand": {
+      "label": "Gold Land",
+      "frame": "goldLand/frame.png",
+      "pt": "goldLand/pt.png",
+      "legendary": "goldLand/legendary.png"
+    },
+    "colorless": {
+      "label": "Colorless",
+      "frame": "colorless/frame.png",
+      "pt": "colorless/pt.png",
+      "legendary": "colorless/legendary.png"
+    },
+    "colorlessLand": {
+      "label": "Colorless Land",
+      "frame": "colorlessLand/frame.png",
+      "pt": "colorlessLand/pt.png",
+      "legendary": "colorlessLand/legendary.png"
+    },
+    "artifact": {
+      "label": "Artifact",
+      "frame": "artifact/frame.png",
+      "pt": "artifact/pt.png",
+      "legendary": "artifact/legendary.png"
+    },
+    "vehicle": {
+      "label": "Vehicle",
+      "frame": "vehicle/frame.png",
+      "pt": "vehicle/pt.png",
+      "legendary": "vehicle/legendary.png"
+    }
+  },
+  "layout": {
+    "title": {
+      "x": 62,
+      "y": 56,
+      "font": "Beleren Bold",
+      "size": 40,
+      "spacing": 0.15
+    },
+    "mana": {
+      "right_x": 692,
+      "y": 59,
+      "radius": 17.5,
+      "step": 39
+    },
+    "type": {
+      "x": 62,
+      "y": 595,
+      "font": "Beleren Bold",
+      "size": 33.5,
+      "spacing": 0.05
+    },
+    "text": {
+      "x": 66,
+      "y": 650,
+      "width": 616,
+      "height": 292,
+      "font": "MPlantin",
+      "max_size": 31,
+      "min_size": 17
+    },
+    "pt": {
+      "box": [
+        571,
+        929,
+        137,
+        75
+      ],
+      "text_center_x": 645,
+      "text_y": 936,
+      "font": "Beleren Bold",
+      "size": 39
+    },
+    "artist": {
+      "x": 106,
+      "y": 995,
+      "font": "Matrix Bold Small Caps",
+      "size": 24,
+      "color": "white",
+      "brush": [
+        80,
+        1000
+      ]
+    },
+    "legal": {
+      "x": 48,
+      "y": 1015,
+      "font": "MPlantin",
+      "size": 17,
+      "color": "white"
+    }
+  },
+  "legendary_supported": true
+}
