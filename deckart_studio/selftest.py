@@ -354,15 +354,35 @@ class SelfTest:
 
     def check_gemini_prompt(self) -> str:
         from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles
-        from deckart_studio.gemini.image_client import compose_art_prompt, first_image_from_response, slug_for
-        western = compose_art_prompt("Western Anime", "Two Jennys on a rooftop", "Parallel Lives", "Enchantment")
-        oil = compose_art_prompt("Painterly oil", "Two Jennys on a rooftop", "Parallel Lives", "Enchantment")
-        custom = compose_art_prompt("My custom neon", "alley rain", "Sol Ring", "")
+        from deckart_studio.gemini.image_client import (
+            CardArtContext, compose_art_prompt, first_image_from_response, generation_config, slug_for,
+        )
+        from deckart_studio.ui.ai_art_panel import friendly_worker_error
+        lives = CardArtContext(true_name="Parallel Lives", type_line="Enchantment")
+        western = compose_art_prompt("Western Anime", "Two Jennys on a rooftop", lives)
+        oil = compose_art_prompt("Painterly oil", "Two Jennys on a rooftop", lives)
+        custom = compose_art_prompt("My custom neon", "alley rain", CardArtContext(true_name="Sol Ring"))
+        renamed = compose_art_prompt(
+            "Western Anime",
+            "a rooftop standoff",
+            CardArtContext(true_name="Dovin's Veto", display_name="River's Trick",
+                           type_line="Instant", rules_text="Counter target spell."),
+        )
         assert "Parallel Lives" in western and "Two Jennys" in western
+        assert "technical background" in western and "Do not paint names" in western
         assert "cel-shad" in western.lower() and "lower third" in western
         assert "card frame" in western
         assert "oil painting" in oil.lower() and "cel-shad" not in oil.lower()
         assert "Art style: My custom neon." in custom
+        assert "True card name: Dovin's Veto." in renamed
+        assert "Custom display name: River's Trick." in renamed
+        assert "Counter target spell." in renamed
+        assert "Do not illustrate the rules literally" in renamed
+        assert generation_config("2K")["imageConfig"]["aspectRatio"] == "2:3"
+        assert "responseFormat" not in generation_config("2K")
+        assert friendly_worker_error("GeminiImageError: Gemini request failed (400): bad aspect") == (
+            "Gemini request failed (400): bad aspect"
+        )
         assert set(DEFAULT_ART_STYLES) == set(STYLE_INSTRUCTIONS)
         assert all(len(text) > 280 for text in STYLE_INSTRUCTIONS.values())
         merged = merge_default_art_styles(["Painterly oil", "My neon"])
@@ -371,7 +391,7 @@ class SelfTest:
         fake = {"candidates": [{"content": {"parts": [{"inlineData": {"data": "aGVsbG8=", "mimeType": "image/png"}}]}}]}
         data, mime = first_image_from_response(fake)
         assert data == b"hello" and mime == "image/png"
-        return "western anime + per-style instructions"
+        return "western anime + card identity + imageConfig"
 
     def check_update_versioning(self) -> str:
         from deckart_studio.ui.main_window import window_title
@@ -379,15 +399,15 @@ class SelfTest:
             is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
             updater_process_flags, version_tuple, write_msi_updater_script,
         )
-        assert version_tuple("0.7.3") > version_tuple("0.7.2")
-        assert is_newer_version("0.7.3", "0.6.9")
-        assert not is_newer_version("0.7.3", "0.7.3")
+        assert version_tuple("0.7.4") > version_tuple("0.7.3")
+        assert is_newer_version("0.7.4", "0.6.9")
+        assert not is_newer_version("0.7.4", "0.7.4")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.3-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.3-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.4-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.4-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.3").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.3").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.4").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.4").endswith("app.msi")
         assert update_download_folder().name == "DeckArtStudioUpdates"
         assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"

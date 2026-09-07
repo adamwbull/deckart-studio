@@ -13,6 +13,7 @@ from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, PREVIEW_SCALE
 from deckart_studio.gallery.thumbnail_loader import resolve_source_path
 from deckart_studio.image_source import ImageSource
 from deckart_studio.tts.card_face import CardFace
+from deckart_studio.gemini.image_client import CardArtContext
 from deckart_studio.ui.ai_art_panel import AiArtPanel
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.card_name_search import CardNameSearch
@@ -264,8 +265,10 @@ class CardMakerDialog(QDialog):
         self._palette.symbolClicked.connect(self._insert_symbol)
         self._ai_panel.artGenerated.connect(self._set_art_path)
         self._ai_panel.openSettingsRequested.connect(self._open_settings)
-        self._name.textChanged.connect(self._sync_ai_card_context)
-        self._type.textChanged.connect(self._sync_ai_card_context)
+        for line_edit in (self._name, self._type, self._custom_name, self._real_name):
+            line_edit.textChanged.connect(self._sync_ai_card_context)
+        self._rules.textChanged.connect(self._sync_ai_card_context)
+        self._use_custom_name.toggled.connect(self._sync_ai_card_context)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self.refresh_preview)
         QApplication.instance().focusChanged.connect(self._on_focus_changed)
@@ -296,7 +299,18 @@ class CardMakerDialog(QDialog):
         self.schedule_preview()
 
     def _sync_ai_card_context(self) -> None:
-        self._ai_panel.set_card_context(self._name.text(), self._type.text())
+        if self._use_custom_name.isChecked():
+            display = self._custom_name.text().strip() or self._name.text().strip()
+            true_name = self._real_name.text().strip() or self._name.text().strip()
+        else:
+            display = ""
+            true_name = self._name.text().strip()
+        self._ai_panel.set_card_context(CardArtContext(
+            true_name=true_name,
+            display_name=display,
+            type_line=self._type.text(),
+            rules_text=self._rules.toPlainText(),
+        ))
 
     def _open_settings(self) -> None:
         from deckart_studio.ui.settings_dialog import SettingsDialog

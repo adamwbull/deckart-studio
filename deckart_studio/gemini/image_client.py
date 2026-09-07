@@ -1,14 +1,18 @@
 import base64
+import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 
 from deckart_studio.gemini.art_styles import general_instructions, instruction_for_style
 from deckart_studio.net import fetch_json
 from deckart_studio.settings import AppSettings
 
+LOGGER = logging.getLogger(__name__)
 GEMINI_GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 CARD_ASPECT_RATIO = "2:3"
 
@@ -27,6 +31,14 @@ IMAGE_MODELS = {
 
 
 @dataclass(frozen=True)
+class CardArtContext:
+    true_name: str = ""
+    display_name: str = ""
+    type_line: str = ""
+    rules_text: str = ""
+
+
+@dataclass(frozen=True)
 class GeneratedArt:
     path: Path
     prompt: str
@@ -41,18 +53,37 @@ def model_choices() -> list[tuple[str, str]]:
     return [(entry["label"], model_id) for model_id, entry in IMAGE_MODELS.items()]
 
 
-def compose_art_prompt(style: str, user_prompt: str, card_name: str = "", type_line: str = "") -> str:
-    sections = [general_instructions()]
-    if card_name.strip():
-        sections.append(f"Card name: {card_name.strip()}.")
-    if type_line.strip():
-        sections.append(f"Type line: {type_line.strip()}.")
+def compose_art_prompt(style: str, user_prompt: str, context: CardArtContext | None = None) -> str:
+    sections = [general_instructions(), card_identity_text(context or CardArtContext())]
     style_text = instruction_for_style(style)
     if style_text:
         sections.append(style_text)
     if user_prompt.strip():
         sections.append(user_prompt.strip())
-    return " ".join(sections)
+    return " ".join(section for section in sections if section)
+
+
+def card_identity_text(context: CardArtContext) -> str:
+    true_name = context.true_name.strip()
+    display_name = context.display_name.strip()
+    type_line = context.type_line.strip()
+    rules_text = " ".join(context.rules_text.split())
+    if not any((true_name, display_name, type_line, rules_text)):
+        return ""
+    parts = [
+        "The next lines are the printed card identity. Use them only as technical background "
+        "so you know what the card is. Do not paint names, type lines, rules, or mana. "
+        "Do not illustrate the rules literally; suggest the idea of the card."
+    ]
+    if true_name:
+        parts.append(f"True card name: {true_name}.")
+    if display_name and display_name != true_name:
+        parts.append(f"Custom display name: {display_name}.")
+    if type_line:
+        parts.append(f"Type line: {type_line}.")
+    if rules_text:
+        parts.append(f"Rules text: {rules_text}.")
+    return " ".join(parts)
 
 
 def slug_for(text: str) -> str:
@@ -62,32 +93,52 @@ def slug_for(text: str) -> str:
 
 class GeminiImageClient:
     def generate_card_art(self, settings: AppSettings, style: str, user_prompt: str,
-                          card_name: str = "", type_line: str = "") -> GeneratedArt:
+                          context: CardArtContext | None = None) -> GeneratedArt:
         api_key = settings.gemini_api_key.strip()
         if not api_key:
             raise GeminiImageError("Add a Gemini API key in Settings before generating art.")
+        card = context or CardArtContext()
         model = IMAGE_MODELS.get(settings.gemini_model_id, IMAGE_MODELS["nano-banana-2"])
-        prompt = compose_art_prompt(style, user_prompt, card_name, type_line)
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-                "responseFormat": {"image": {"aspectRatio": CARD_ASPECT_RATIO, "imageSize": model["image_size"]}},
-            },
-        }
+        prompt = compose_art_prompt(style, user_prompt, card)
+        LOGGER.info("generate start model=%s style=%s true_name=%s", model["api_id"], style, card.true_name)
         try:
             response = fetch_json(
-                GEMINI_GENERATE_URL.format(model=model["api_id"]),
-                body=payload,
+                generate_url(model["api_id"], api_key),
+                body={
+                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                    "generationConfig": generation_config(model["image_size"]),
+                },
                 timeout=180.0,
-                headers={"x-goog-api-key": api_key},
             )
         except HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")[:400]
-            raise GeminiImageError(f"Gemini request failed ({error.code}): {detail}") from error
+            raise GeminiImageError(http_error_message(error)) from error
+        except URLError as error:
+            raise GeminiImageError(f"Could not reach Gemini: {error.reason}") from error
         image_bytes, mime_type = first_image_from_response(response)
-        destination = save_generated_image(settings.generated_ai_folder(), card_name, style, image_bytes, mime_type)
+        destination = save_generated_image(settings.generated_ai_folder(), card.true_name, style, image_bytes, mime_type)
+        LOGGER.info("generate saved %s", destination.name)
         return GeneratedArt(destination, prompt, settings.gemini_model_id)
+
+
+def generate_url(model_id: str, api_key: str) -> str:
+    return f"{GEMINI_GENERATE_URL.format(model=model_id)}?{urlencode({'key': api_key})}"
+
+
+def generation_config(image_size: str) -> dict:
+    return {
+        "responseModalities": ["TEXT", "IMAGE"],
+        "imageConfig": {"aspectRatio": CARD_ASPECT_RATIO, "imageSize": image_size},
+    }
+
+
+def http_error_message(error: HTTPError) -> str:
+    raw = error.read().decode("utf-8", errors="replace")
+    try:
+        payload = json.loads(raw)
+        detail = str((payload.get("error") or {}).get("message") or raw)
+    except ValueError:
+        detail = raw
+    return f"Gemini request failed ({error.code}): {detail[:300]}"
 
 
 def first_image_from_response(response: dict) -> tuple[bytes, str]:

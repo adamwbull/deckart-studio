@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget,
 )
 
-from deckart_studio.gemini.image_client import GeminiImageClient, model_choices
+from deckart_studio.gemini.image_client import CardArtContext, GeminiImageClient, model_choices
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.styles import PRIMARY_BUTTON_STYLE
 from deckart_studio.ui.workers import run_in_background
@@ -23,8 +23,7 @@ class AiArtPanel(QWidget):
     def __init__(self, context: AppContext, parent: QWidget | None = None):
         super().__init__(parent)
         self.context = context
-        self._card_name = ""
-        self._type_line = ""
+        self._card = CardArtContext()
         self._model = QComboBox()
         self._style = QComboBox()
         self._style.setEditable(False)
@@ -38,6 +37,7 @@ class AiArtPanel(QWidget):
         self._prompt.setPlaceholderText("Describe the scene. The selected style already includes full illustration instructions.")
         self._prompt.setMinimumHeight(140)
         self._status.setWordWrap(True)
+        self._status.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self._preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._preview.setMinimumHeight(200)
         self._generate.setStyleSheet(PRIMARY_BUTTON_STYLE)
@@ -55,6 +55,8 @@ class AiArtPanel(QWidget):
         layout.addWidget(self._preview, 1)
         layout.addWidget(hint)
         self.reload_from_settings()
+        self._style.currentTextChanged.connect(self._persist_style)
+        self._model.currentIndexChanged.connect(self._persist_model)
 
     def _form(self) -> QFormLayout:
         add_style = QPushButton("Add style…")
@@ -73,9 +75,8 @@ class AiArtPanel(QWidget):
         form.addRow("", settings_link)
         return form
 
-    def set_card_context(self, card_name: str, type_line: str) -> None:
-        self._card_name = card_name
-        self._type_line = type_line
+    def set_card_context(self, card: CardArtContext) -> None:
+        self._card = card
 
     def reload_from_settings(self) -> None:
         settings = self.context.settings
@@ -101,6 +102,19 @@ class AiArtPanel(QWidget):
         self._style.setCurrentIndex(index if index >= 0 else 0)
         self._style.blockSignals(False)
 
+    def _persist_style(self, style: str) -> None:
+        if not style:
+            return
+        self.context.settings.last_art_style = style
+        self.context.settings.save()
+
+    def _persist_model(self) -> None:
+        model_id = self._model.currentData()
+        if not model_id:
+            return
+        self.context.settings.gemini_model_id = model_id
+        self.context.settings.save()
+
     def _add_style(self) -> None:
         style, accepted = QInputDialog.getText(self, "Add art style", "Style name")
         name = style.strip()
@@ -125,9 +139,9 @@ class AiArtPanel(QWidget):
         self._status.setText("Generating with Gemini…")
         style = self._style.currentText()
         prompt = self._prompt.toPlainText()
-        card_name, type_line = self._card_name, self._type_line
+        card = self._card
         run_in_background(
-            lambda report: GeminiImageClient().generate_card_art(settings, style, prompt, card_name, type_line),
+            lambda report: GeminiImageClient().generate_card_art(settings, style, prompt, card),
             self._on_generated,
             self._on_failed,
             owner=self,
@@ -143,13 +157,19 @@ class AiArtPanel(QWidget):
 
     def _on_failed(self, error: str) -> None:
         self._generate.setEnabled(True)
-        message = error.splitlines()[-1] if error else "Generation failed."
-        if "GeminiImageError" in message:
-            message = message.split("GeminiImageError: ", 1)[-1]
-        self._status.setText(message)
+        self._status.setText(friendly_worker_error(error))
 
     def _show_preview(self, path: Path) -> None:
         pixmap = QPixmap(str(path))
         if pixmap.isNull():
             return
         self._preview.setPixmap(pixmap.scaledToWidth(PREVIEW_WIDTH, Qt.TransformationMode.SmoothTransformation))
+
+
+def friendly_worker_error(error: str) -> str:
+    for line in reversed(error.splitlines()):
+        if "GeminiImageError:" in line:
+            return line.split("GeminiImageError:", 1)[-1].strip()
+        if line.startswith("URLError:") or line.startswith("URLError("):
+            return line
+    return error.splitlines()[-1] if error else "Generation failed."
