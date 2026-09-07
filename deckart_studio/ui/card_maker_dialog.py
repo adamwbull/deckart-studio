@@ -76,10 +76,8 @@ class CardMakerDialog(QDialog):
         self._offset_x = QSlider(Qt.Orientation.Horizontal)
         self._offset_y = QSlider(Qt.Orientation.Horizontal)
         self._plate_texture = QComboBox()
-        self._head_opacity = QSlider(Qt.Orientation.Horizontal)
-        self._body_opacity = QSlider(Qt.Orientation.Horizontal)
-        self._head_opacity_label = QLabel()
-        self._body_opacity_label = QLabel()
+        self._plate_opacity = QSlider(Qt.Orientation.Horizontal)
+        self._plate_opacity_label = QLabel()
         self._plate_panel = QWidget()
         self._palette = SymbolPalette(self.context.card_assets)
         self._ai_panel = AiArtPanel(self.context)
@@ -107,10 +105,8 @@ class CardMakerDialog(QDialog):
         self._mana.setPlaceholderText("{2}{U}{U}")
         self._search.set_text(self.card.nickname)
         self._populate_plate_texture_choices()
-        self._head_opacity.setRange(10, 100)
-        self._head_opacity.setValue(int(self.design.head_opacity * OPACITY_SLIDER_SCALE))
-        self._body_opacity.setRange(10, 100)
-        self._body_opacity.setValue(int(self.design.body_opacity * OPACITY_SLIDER_SCALE))
+        self._plate_opacity.setRange(40, 100)
+        self._plate_opacity.setValue(int(max(self.design.head_opacity, self.design.body_opacity) * OPACITY_SLIDER_SCALE))
         self._update_opacity_labels()
         self._refresh_plate_panel_visibility()
         self._update_art_label()
@@ -125,8 +121,7 @@ class CardMakerDialog(QDialog):
         self._plate_texture.blockSignals(False)
 
     def _update_opacity_labels(self) -> None:
-        self._head_opacity_label.setText(f"{self._head_opacity.value()}%")
-        self._body_opacity_label.setText(f"{self._body_opacity.value()}%")
+        self._plate_opacity_label.setText(f"{self._plate_opacity.value()}%")
 
     def _refresh_plate_panel_visibility(self) -> None:
         template = self.context.card_assets.template(self._template.currentData())
@@ -182,19 +177,13 @@ class CardMakerDialog(QDialog):
     def _plate_options_panel(self) -> QWidget:
         layout = QFormLayout(self._plate_panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        head_row = QWidget()
-        head_layout = QHBoxLayout(head_row)
-        head_layout.setContentsMargins(0, 0, 0, 0)
-        head_layout.addWidget(self._head_opacity, 1)
-        head_layout.addWidget(self._head_opacity_label)
-        body_row = QWidget()
-        body_layout = QHBoxLayout(body_row)
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.addWidget(self._body_opacity, 1)
-        body_layout.addWidget(self._body_opacity_label)
+        opacity_row = QWidget()
+        opacity_layout = QHBoxLayout(opacity_row)
+        opacity_layout.setContentsMargins(0, 0, 0, 0)
+        opacity_layout.addWidget(self._plate_opacity, 1)
+        opacity_layout.addWidget(self._plate_opacity_label)
         layout.addRow("Plate texture", self._plate_texture)
-        layout.addRow("Head opacity", head_row)
-        layout.addRow("Body opacity", body_row)
+        layout.addRow("Plate opacity", opacity_row)
         return self._plate_panel
 
     @staticmethod
@@ -269,8 +258,7 @@ class CardMakerDialog(QDialog):
         self._crown.toggled.connect(self.schedule_preview)
         self._use_custom_name.toggled.connect(self._on_custom_name_toggled)
         self._plate_texture.currentIndexChanged.connect(self.schedule_preview)
-        self._head_opacity.valueChanged.connect(self._on_head_opacity_changed)
-        self._body_opacity.valueChanged.connect(self._on_body_opacity_changed)
+        self._plate_opacity.valueChanged.connect(self._on_plate_opacity_changed)
         for slider in (self._zoom, self._offset_x, self._offset_y):
             slider.valueChanged.connect(self.schedule_preview)
         self._palette.symbolClicked.connect(self._insert_symbol)
@@ -303,11 +291,7 @@ class CardMakerDialog(QDialog):
         else:
             self._name_label.setText("Card name")
 
-    def _on_head_opacity_changed(self) -> None:
-        self._update_opacity_labels()
-        self.schedule_preview()
-
-    def _on_body_opacity_changed(self) -> None:
+    def _on_plate_opacity_changed(self) -> None:
         self._update_opacity_labels()
         self.schedule_preview()
 
@@ -396,8 +380,7 @@ class CardMakerDialog(QDialog):
         self._real_name.setEnabled(self.design.use_custom_name)
         self._refresh_name_field_labels()
         self._populate_plate_texture_choices()
-        self._head_opacity.setValue(int(self.design.head_opacity * OPACITY_SLIDER_SCALE))
-        self._body_opacity.setValue(int(self.design.body_opacity * OPACITY_SLIDER_SCALE))
+        self._plate_opacity.setValue(int(max(self.design.head_opacity, self.design.body_opacity) * OPACITY_SLIDER_SCALE))
         self._update_opacity_labels()
         self._refresh_plate_panel_visibility()
         self._mana.setText(self.design.mana_cost)
@@ -418,9 +401,10 @@ class CardMakerDialog(QDialog):
         self.design.use_custom_name = self._use_custom_name.isChecked()
         self.design.custom_name = self._custom_name.text()
         self.design.real_name = self._real_name.text() if self.design.use_custom_name else name
-        self.design.plate_texture_id = self._plate_texture.currentData() or "smooth"
-        self.design.head_opacity = self._head_opacity.value() / OPACITY_SLIDER_SCALE
-        self.design.body_opacity = self._body_opacity.value() / OPACITY_SLIDER_SCALE
+        self.design.plate_texture_id = self._plate_texture.currentData() or "stone"
+        opacity = self._plate_opacity.value() / OPACITY_SLIDER_SCALE
+        self.design.head_opacity = opacity
+        self.design.body_opacity = opacity
         self.design.type_line, self.design.rules_text = self._type.text(), self._rules.toPlainText()
         self.design.power, self.design.toughness = self._power.text(), self._toughness.text()
         self.design.artist, self.design.legal_text = self._artist.text(), self._legal.text()

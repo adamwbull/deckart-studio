@@ -326,20 +326,22 @@ class SelfTest:
 
     def check_fullart_plates(self) -> str:
         from deckart_studio.cardmaker.card_renderer import CardRenderer, EXPORT_SCALE
+        from deckart_studio.cardmaker.plate_textures import LEGACY_TEXTURE_IDS
         smooth = sample_design("fullart", self._synthetic_art())
         smooth.plate_texture_id = "smooth"
-        smooth.head_opacity = 0.75
-        smooth.body_opacity = 0.55
+        stone = sample_design("fullart", self._synthetic_art())
+        stone.plate_texture_id = "stone"
         granite = sample_design("fullart", self._synthetic_art())
         granite.plate_texture_id = "granite"
-        granite.head_opacity = 0.94
-        granite.body_opacity = 0.90
         renderer = CardRenderer(self.assets)
         assert not renderer.render(smooth, EXPORT_SCALE).isNull(), "smooth full art did not render"
+        assert not renderer.render(stone, EXPORT_SCALE).isNull(), "stone full art did not render"
         assert not renderer.render(granite, EXPORT_SCALE).isNull(), "granite full art did not render"
+        assert self.assets.plate_textures.get("arcane").id == LEGACY_TEXTURE_IDS["arcane"]
+        assert self.assets.plate_textures.get("stone").sheet is not None
         count = len(self.assets.plate_textures.list())
         assert count >= 8, count
-        return f"{count} plate textures, smooth + granite OK"
+        return f"{count} aligned plate sheets, stone + granite OK"
 
     def check_gemini_prompt(self) -> str:
         from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles
@@ -364,17 +366,20 @@ class SelfTest:
 
     def check_update_versioning(self) -> str:
         from deckart_studio.updates import (
-            is_msi_install, is_newer_version, release_msi_url, release_zip_url, version_tuple,
+            is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
+            version_tuple,
         )
-        assert version_tuple("0.7.0") > version_tuple("0.6.9")
-        assert is_newer_version("0.7.0", "0.6.9")
-        assert not is_newer_version("0.7.0", "0.7.0")
+        assert version_tuple("0.7.1") > version_tuple("0.7.0")
+        assert is_newer_version("0.7.1", "0.6.9")
+        assert not is_newer_version("0.7.1", "0.7.1")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.0-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.0-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.1-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.1-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.0").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.0").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.1").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.1").endswith("app.msi")
+        assert update_download_folder().name == "DeckArtStudioUpdates"
+        assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"
         marker.write_text("msi", encoding="utf-8")
         assert is_msi_install(self.workspace)

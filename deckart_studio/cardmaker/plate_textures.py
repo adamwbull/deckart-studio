@@ -8,17 +8,21 @@ from deckart_studio.app_paths import resource_root
 
 TEXTURES_ROOT = resource_root() / "assets" / "cardmaker" / "textures"
 CATALOG_FILE = TEXTURES_ROOT / "textures.json"
+LEGACY_TEXTURE_IDS = {
+    "arcane": "frost",
+    "void": "slate",
+    "colorless": "stone",
+}
 
 
 @dataclass(frozen=True)
 class PlateTexture:
     id: str
     label: str
-    head: Path | None
-    body: Path | None
+    sheet: Path | None
 
     def is_smooth(self) -> bool:
-        return self.head is None and self.body is None
+        return self.sheet is None
 
 
 class PlateTextureLibrary:
@@ -34,20 +38,22 @@ class PlateTextureLibrary:
             texture = PlateTexture(
                 id=entry["id"],
                 label=entry.get("label", entry["id"]),
-                head=optional_texture_file(self.root, entry.get("head")),
-                body=optional_texture_file(self.root, entry.get("body")),
+                sheet=optional_texture_file(self.root, entry.get("sheet") or entry.get("head")),
             )
             self.textures[texture.id] = texture
         if "smooth" not in self.textures:
-            self.textures["smooth"] = PlateTexture("smooth", "Smooth gradient", None, None)
+            self.textures["smooth"] = PlateTexture("smooth", "Smooth", None)
         return self
 
     def list(self) -> list[PlateTexture]:
         return list(self.textures.values())
 
     def get(self, texture_id: str) -> PlateTexture:
-        if texture_id in self.textures:
-            return self.textures[texture_id]
+        resolved = LEGACY_TEXTURE_IDS.get(texture_id, texture_id)
+        if resolved in self.textures:
+            return self.textures[resolved]
+        if "stone" in self.textures:
+            return self.textures["stone"]
         return self.textures["smooth"]
 
     def image(self, path: Path | None) -> QImage | None:

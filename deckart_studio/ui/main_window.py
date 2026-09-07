@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from deckart_studio.tts.saved_objects import discover_deck_files
 from deckart_studio.updates import (
     apply_downloaded_update, download_release_package, frozen_install_folder, is_newer_version,
-    latest_release, should_check_for_updates,
+    latest_release, should_check_for_updates, update_download_folder,
 )
 from deckart_studio.version import APP_VERSION
 from deckart_studio.ui.action_bar import ActionBar
@@ -262,7 +262,7 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Downloading {release.version}…", 8000)
         run_in_background(
-            lambda report: download_release_package(release, install_folder.parent, install_folder),
+            lambda report: download_release_package(release, update_download_folder(), install_folder),
             lambda package_path: self._install_update(package_path, install_folder),
             lambda error: QMessageBox.warning(self, "Update failed", error.splitlines()[-1]),
             owner=self,

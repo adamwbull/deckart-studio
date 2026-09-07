@@ -29,9 +29,9 @@ class CardDesign:
     use_custom_name: bool = False
     custom_name: str = ""
     real_name: str = ""
-    plate_texture_id: str = "smooth"
-    head_opacity: float = 0.94
-    body_opacity: float = 0.90
+    plate_texture_id: str = "stone"
+    head_opacity: float = 0.92
+    body_opacity: float = 0.92
     notes: dict = field(default_factory=dict)
 
     def is_creature(self) -> bool:

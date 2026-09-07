@@ -2,57 +2,53 @@
   "textures": [
     {
       "id": "smooth",
-      "label": "Smooth gradient",
-      "head": null,
-      "body": null
+      "label": "Smooth",
+      "sheet": null
+    },
+    {
+      "id": "stone",
+      "label": "Stone",
+      "sheet": "stone.png"
     },
     {
       "id": "granite",
       "label": "Granite",
-      "head": "granite-head.png",
-      "body": "granite-body.png"
+      "sheet": "granite.png"
+    },
+    {
+      "id": "parchment",
+      "label": "Parchment",
+      "sheet": "parchment.png"
     },
     {
       "id": "linen",
-      "label": "White linen",
-      "head": "linen-head.png",
-      "body": "linen-body.png"
+      "label": "Linen",
+      "sheet": "linen.png"
     },
     {
-      "id": "arcane",
-      "label": "Arcane blue",
-      "head": "arcane-head.png",
-      "body": "arcane-body.png"
+      "id": "slate",
+      "label": "Slate",
+      "sheet": "slate.png"
     },
     {
-      "id": "void",
-      "label": "Void black",
-      "head": "void-head.png",
-      "body": "void-body.png"
+      "id": "frost",
+      "label": "Frost",
+      "sheet": "frost.png"
     },
     {
       "id": "ember",
-      "label": "Ember red",
-      "head": "ember-head.png",
-      "body": "ember-body.png"
+      "label": "Ember",
+      "sheet": "ember.png"
     },
     {
       "id": "grove",
-      "label": "Grove green",
-      "head": "grove-head.png",
-      "body": "grove-body.png"
+      "label": "Grove",
+      "sheet": "grove.png"
     },
     {
       "id": "gilded",
-      "label": "Gilded gold",
-      "head": "gilded-head.png",
-      "body": "gilded-body.png"
-    },
-    {
-      "id": "colorless",
-      "label": "Colorless steel",
-      "head": "colorless-head.png",
-      "body": "colorless-body.png"
+      "label": "Gilded",
+      "sheet": "gilded.png"
     }
   ]
 }

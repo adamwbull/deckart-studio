@@ -97,10 +97,30 @@ def download_release_zip(release: AppRelease, destination: Path) -> Path:
     return download_file(release.zip_url, destination)
 
 
+def update_download_folder(preferred: Path | None = None) -> Path:
+    folder = Path(preferred) if preferred and is_writable_directory(preferred) else Path(tempfile.gettempdir()) / "DeckArtStudioUpdates"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def is_writable_directory(folder: Path) -> bool:
+    try:
+        if folder.exists() and not folder.is_dir():
+            return False
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".deckart_write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def download_release_package(release: AppRelease, destination_folder: Path, install_folder: Path) -> Path:
+    folder = update_download_folder(destination_folder)
     if is_msi_install(install_folder) and release.msi_url:
-        return download_file(release.msi_url, destination_folder / f"DeckArtStudio-{release.version}-win64.msi")
-    return download_file(release.zip_url, destination_folder / f"DeckArtStudio-{release.version}-win64.zip")
+        return download_file(release.msi_url, folder / f"DeckArtStudio-{release.version}-win64.msi")
+    return download_file(release.zip_url, folder / f"DeckArtStudio-{release.version}-win64.zip")
 
 
 def apply_downloaded_update(package_path: Path, install_folder: Path, restart_pid: int) -> Path:
@@ -144,7 +164,7 @@ def write_msi_updater_script(msi_path: Path, install_folder: Path, restart_pid: 
             "  timeout /t 1 /nobreak >nul",
             "  goto wait",
             ")",
-            f'msiexec /i "{msi_path}" /passive /norestart',
+            f'msiexec /i "{msi_path}" /qb /norestart',
             f'start "" "{exe}"',
             "",
         ]),
