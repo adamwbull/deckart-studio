@@ -11,7 +11,8 @@ This repository is the **application only**. Personal decks, generated art, and 
 - Gemini **Nano Banana 2** / **Nano Banana 2 Lite** art generation from a Google API key
 - Generated images save to `DeckArt/generated_ai` immediately (AI Recommended gallery)
 - Publish local and Scryfall images to Steam Cloud for TTS
-- Auto-update from [GitHub Releases](https://github.com/adamwbull/deckart-studio/releases)
+- Auto-update from [GitHub Releases](https://github.com/adamwbull/deckart-studio/releases) (startup check on by default)
+- Windows MSI: Start Menu, Search, optional desktop shortcut and taskbar pin
 
 ## Run from source
 
@@ -29,24 +30,29 @@ python -m venv .venv
 .venv\Scripts\python.exe -m deckart_studio
 ```
 
-## Build a Windows zip
+## Build Windows zip and MSI
 
 ```bat
 powershell -ExecutionPolicy Bypass -File packaging\build_exe.ps1
 ```
 
-Output: `dist\DeckArtStudio-<version>-win64.zip`
+Output:
+
+- `dist\DeckArtStudio-<version>-win64.zip` (portable / in-place updates)
+- `dist\DeckArtStudio-<version>-win64.msi` (Program Files, Start Menu, Search)
+
+The MSI offers desktop shortcut and taskbar pin during setup. The zip is still required so older installs can auto-update.
 
 ## Releases
 
 Push a version tag matching `APP_VERSION` in `deckart_studio/version.py`:
 
 ```bat
-git tag v0.6.8
-git push origin v0.6.8
+git tag v0.6.9
+git push origin v0.6.9
 ```
 
-GitHub Actions builds the zip and publishes a Release. The installed app checks that Release on startup and can download/install it.
+GitHub Actions builds the zip and MSI and publishes a Release. Installed copies check that Release on startup (on by default) and can download/install it.
 
 ## Gemini art
 

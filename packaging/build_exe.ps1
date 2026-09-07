@@ -8,6 +8,7 @@
     3. Generates the icon and runs PyInstaller (packaging\DeckArtStudio.spec).
     4. Runs the self-test again, this time inside the frozen EXE.
     5. Zips dist\DeckArtStudio into dist\DeckArtStudio-<version>-win64.zip.
+    6. Builds dist\DeckArtStudio-<version>-win64.msi with Start Menu, desktop, and taskbar options.
 
 .PARAMETER Online
     Also exercise Scryfall in the self-tests (needs internet).
@@ -117,6 +118,55 @@ function Create-Zip($version) {
     Write-Host "Folder: $DistFolder" -ForegroundColor Green
 }
 
+function Ensure-Wix {
+    $wixVersion = "5.0.2"
+    $dotnetTools = Join-Path $env:USERPROFILE ".dotnet\tools"
+    if ($env:PATH -notlike "*$dotnetTools*") {
+        $env:PATH = "$dotnetTools;$env:PATH"
+    }
+    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+        throw "The .NET SDK is required to build the MSI installer."
+    }
+    $current = ""
+    if (Get-Command wix -ErrorAction SilentlyContinue) {
+        $current = ((& wix --version) | Select-Object -First 1).ToString().Split("+")[0].Trim()
+    }
+    if ($current -ne $wixVersion) {
+        Step "Installing WiX $wixVersion"
+        if ($current) { & dotnet tool uninstall --global wix | Out-Null }
+        & dotnet tool install --global wix --version $wixVersion
+        $env:PATH = "$dotnetTools;$env:PATH"
+    }
+    if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
+        throw "WiX CLI was not found after install. Add $dotnetTools to PATH."
+    }
+    & wix extension add -g "WixToolset.UI.wixext/$wixVersion"
+}
+
+function Create-Msi($version) {
+    Step "Building MSI"
+    Ensure-Wix
+    $wixWork = Join-Path $ProjectRoot "build\wix"
+    New-Item -ItemType Directory -Force -Path $wixWork | Out-Null
+    Set-Content -Path (Join-Path $wixWork "install_kind.txt") -Value "msi" -NoNewline -Encoding ascii
+    $msi = Join-Path $ProjectRoot "dist\DeckArtStudio-$version-win64.msi"
+    if (Test-Path $msi) { Remove-Item $msi -Force }
+    & wix build (Join-Path $ProjectRoot "packaging\msi\Product.wxs") `
+        -arch x64 `
+        -d "Version=$version" `
+        -ext WixToolset.UI.wixext `
+        -bindpath "app=$DistFolder" `
+        -bindpath ("packaging=" + (Join-Path $ProjectRoot "packaging")) `
+        -bindpath ("msi=" + (Join-Path $ProjectRoot "packaging\msi")) `
+        -bindpath "marker=$wixWork" `
+        -intermediateFolder $wixWork `
+        -pdbtype none `
+        -o $msi
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $msi)) { throw "MSI build failed" }
+    $sizeMb = [math]::Round((Get-Item $msi).Length / 1MB, 1)
+    Write-Host "Built: $msi ($sizeMb MB)" -ForegroundColor Green
+}
+
 Push-Location $ProjectRoot
 try {
     Ensure-Venv
@@ -129,6 +179,7 @@ try {
     if (-not $SkipTests) { Run-FrozenSelftest }
     Copy-ReadMe
     Create-Zip $version
+    Create-Msi $version
     if ($Launch) { Start-Process (Join-Path $DistFolder "DeckArtStudio.exe") }
 }
 finally {

@@ -1,0 +1,119 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="DeckArt Studio"
+           Manufacturer="DeckArt Studio"
+           Version="$(var.Version)"
+           UpgradeCode="8F3C2A91-4B17-4D6E-A8F1-7C2E9B4D5A10"
+           Language="1033"
+           Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of DeckArt Studio is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon.ico" SourceFile="!(bindpath.packaging)\deckart.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/adamwbull/deckart-studio" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/adamwbull/deckart-studio" />
+    <Property Id="ARPCOMMENTS" Value="Custom card art for Tabletop Simulator" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="DeckArt Studio" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppStartMenuFolder" Name="DeckArt Studio" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="!(bindpath.app)\**" />
+      <File Source="!(bindpath.msi)\pin_taskbar.ps1" />
+      <File Source="!(bindpath.marker)\install_kind.txt" />
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="AppStartMenuFolder" Guid="*">
+      <Shortcut Id="StartMenuLnk"
+                Name="DeckArt Studio"
+                Description="Custom card art for Tabletop Simulator"
+                Target="[INSTALLFOLDER]DeckArtStudio.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico">
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="DeckArtStudio.App" />
+      </Shortcut>
+      <RemoveFolder Id="AppStartMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="Software\DeckArtStudio"
+                     Name="StartMenuShortcut"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Component Id="AppPaths" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\DeckArtStudio.exe">
+        <RegistryValue Type="string" Value="[INSTALLFOLDER]DeckArtStudio.exe" />
+        <RegistryValue Type="string" Name="Path" Value="[INSTALLFOLDER]" />
+      </RegistryKey>
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
+      <Shortcut Id="DesktopLnk"
+                Name="DeckArt Studio"
+                Description="Custom card art for Tabletop Simulator"
+                Target="[INSTALLFOLDER]DeckArtStudio.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon.ico">
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="DeckArtStudio.App" />
+      </Shortcut>
+      <RegistryValue Root="HKCU"
+                     Key="Software\DeckArtStudio"
+                     Name="DesktopShortcut"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Component Id="TaskbarPinRegistry" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKCU"
+                     Key="Software\DeckArtStudio"
+                     Name="PinToTaskbarRequested"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Feature Id="ProductFeature"
+             Title="DeckArt Studio"
+             Description="Install the application, Start Menu shortcut, and Windows Search registration."
+             Level="1"
+             AllowAbsent="no"
+             Display="expand">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="AppPaths" />
+    </Feature>
+    <Feature Id="DesktopShortcutFeature"
+             Title="Desktop shortcut"
+             Description="Add a DeckArt Studio icon to the desktop."
+             Level="1">
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+    <Feature Id="TaskbarPin"
+             Title="Pin to taskbar"
+             Description="Pin DeckArt Studio to the taskbar after setup. Windows 11 may ignore installer pinning."
+             Level="1">
+      <ComponentRef Id="TaskbarPinRegistry" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <WixVariable Id="WixUILicenseRtf" Value="!(bindpath.msi)\License.rtf" />
+
+    <CustomAction Id="PinToTaskbar"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="[System64Folder]WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File &quot;[INSTALLFOLDER]pin_taskbar.ps1&quot;"
+                  Execute="immediate"
+                  Return="ignore"
+                  Impersonate="yes" />
+    <InstallExecuteSequence>
+      <Custom Action="PinToTaskbar" After="InstallFinalize" Condition="(&amp;TaskbarPin=3) AND NOT REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

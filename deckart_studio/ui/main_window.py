@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 
 from deckart_studio.tts.saved_objects import discover_deck_files
 from deckart_studio.updates import (
-    apply_downloaded_update, download_release_zip, frozen_install_folder, is_newer_version,
+    apply_downloaded_update, download_release_package, frozen_install_folder, is_newer_version,
     latest_release, should_check_for_updates,
 )
 from deckart_studio.version import APP_VERSION
@@ -262,15 +262,15 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Downloading {release.version}…", 8000)
         run_in_background(
-            lambda report: download_release_zip(release, install_folder.parent / f"DeckArtStudio-{release.version}-win64.zip"),
-            lambda zip_path: self._install_update(zip_path, install_folder),
+            lambda report: download_release_package(release, install_folder.parent, install_folder),
+            lambda package_path: self._install_update(package_path, install_folder),
             lambda error: QMessageBox.warning(self, "Update failed", error.splitlines()[-1]),
             owner=self,
         )
 
-    def _install_update(self, zip_path: object, install_folder) -> None:
+    def _install_update(self, package_path: object, install_folder) -> None:
         from pathlib import Path
-        apply_downloaded_update(Path(zip_path), install_folder, os.getpid())
+        apply_downloaded_update(Path(package_path), install_folder, os.getpid())
         QMessageBox.information(self, "Installing update", "DeckArt Studio will close and reopen on the new version.")
         self.close()
 

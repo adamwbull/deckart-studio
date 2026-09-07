@@ -15,13 +15,19 @@ from deckart_studio.ui.grouped_image_browser import GroupedImageBrowser, ImageGr
 from deckart_studio.ui.image_tile_grid import ImageTileGrid
 from deckart_studio.ui.workers import run_in_background
 
-GALLERY_SECTIONS = (GallerySection.HANDPICKED, GallerySection.AI_RECOMMENDED)
-GALLERY_TAB = 0
-ORIGINAL_TAB = 1
+HANDPICKED_TAB = 0
+AI_TAB = 1
+ORIGINAL_TAB = 2
+TAB_FOR_SECTION = {
+    GallerySection.HANDPICKED: HANDPICKED_TAB,
+    GallerySection.AI_RECOMMENDED: AI_TAB,
+    GallerySection.ORIGINAL: ORIGINAL_TAB,
+}
+AI_EMPTY_HINT = "Gemini images from Card Maker land in DeckArt/generated_ai and show up here. Folders ending in _ai are listed too."
 
 
 class GalleryPickerPanel(QWidget):
-    """Two picker pages: your own Gallery grouped by folder (default), and the card's Original printings."""
+    """Three picker pages: Gallery, AI Recommended, and the card's Original printings."""
 
     sourceChosen = Signal(ImageSource)
 
@@ -31,6 +37,7 @@ class GalleryPickerPanel(QWidget):
         self._card_name = ""
         self._tabs = QTabWidget(self)
         self._gallery = GroupedImageBrowser(context.thumbnails, tile_width)
+        self._ai = GroupedImageBrowser(context.thumbnails, tile_width, empty_hint=AI_EMPTY_HINT)
         self._original = ImageTileGrid(context.thumbnails, tile_width)
         self._original_status = QLabel("Pick a card to see its official printings.")
         self._search_button = QPushButton("Fetch printings from Scryfall")
@@ -39,9 +46,10 @@ class GalleryPickerPanel(QWidget):
         self.reload_gallery()
 
     def _build_layout(self) -> None:
-        self._tabs.addTab(self._gallery_page(), "Gallery")
+        self._tabs.addTab(self._handpicked_page(), "Gallery")
+        self._tabs.addTab(self._ai_page(), "AI Recommended")
         self._tabs.addTab(self._original_page(), "Original")
-        self._tabs.setCurrentIndex(GALLERY_TAB)
+        self._tabs.setCurrentIndex(HANDPICKED_TAB)
         self._tabs.setCornerWidget(self._refresh_button(), Qt.Corner.TopRightCorner)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -53,14 +61,26 @@ class GalleryPickerPanel(QWidget):
         button.clicked.connect(self.context.refresh_gallery)
         return button
 
-    def _gallery_page(self) -> QWidget:
+    def _handpicked_page(self) -> QWidget:
+        return self._drop_browser_page(
+            "Drop photos or folders here to add them to the gallery",
+            self._gallery,
+        )
+
+    def _ai_page(self) -> QWidget:
+        return self._drop_browser_page(
+            "Drop photos or folders ending in _ai. Gemini images already live in DeckArt/generated_ai.",
+            self._ai,
+        )
+
+    def _drop_browser_page(self, hint: str, browser: GroupedImageBrowser) -> QWidget:
         page = QWidget()
-        drop = DropZone("Drop photos or folders here to add them to the gallery")
+        drop = DropZone(hint)
         drop.pathsDropped.connect(self._on_gallery_paths_dropped)
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(drop)
-        layout.addWidget(self._gallery, 1)
+        layout.addWidget(browser, 1)
         return page
 
     def _original_page(self) -> QWidget:
@@ -76,15 +96,22 @@ class GalleryPickerPanel(QWidget):
 
     def _connect(self) -> None:
         self._gallery.sourceActivated.connect(self.sourceChosen)
+        self._ai.sourceActivated.connect(self.sourceChosen)
         self._original.sourceActivated.connect(self._on_original_activated)
         self._search_button.clicked.connect(self._search_scryfall)
         self.context.galleryChanged.connect(self.reload_gallery)
 
     def reload_gallery(self) -> None:
-        images = [image for section in GALLERY_SECTIONS for image in self.context.gallery.images(section)]
-        self._gallery.set_groups(group_gallery_images(images))
-        self._tabs.setTabText(GALLERY_TAB, f"Gallery ({len(images)})")
+        handpicked = self.context.gallery.images(GallerySection.HANDPICKED)
+        recommended = self.context.gallery.images(GallerySection.AI_RECOMMENDED)
+        self._gallery.set_groups(group_gallery_images(handpicked))
+        self._ai.set_groups(group_gallery_images(recommended))
+        self._tabs.setTabText(HANDPICKED_TAB, f"Gallery ({len(handpicked)})")
+        self._tabs.setTabText(AI_TAB, f"AI Recommended ({len(recommended)})")
         self.set_card_name(self._card_name)
+
+    def tab_titles(self) -> list[str]:
+        return [self._tabs.tabText(index) for index in range(self._tabs.count())]
 
     def set_card_name(self, card_name: str) -> None:
         self._card_name = card_name
@@ -94,7 +121,7 @@ class GalleryPickerPanel(QWidget):
         self._original_status.setText(describe_original_results(card_name, len(arts)))
 
     def show_section(self, section: GallerySection) -> None:
-        self._tabs.setCurrentIndex(ORIGINAL_TAB if section == GallerySection.ORIGINAL else GALLERY_TAB)
+        self._tabs.setCurrentIndex(TAB_FOR_SECTION.get(section, HANDPICKED_TAB))
 
     def _on_gallery_paths_dropped(self, paths: list[Path]) -> None:
         added = self.context.register_dropped_paths(paths)

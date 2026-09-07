@@ -4,6 +4,8 @@ DeckArt Studio
 Custom card art for Tabletop Simulator MTG decks.
 
 GETTING STARTED
+  Prefer the MSI installer from the GitHub Release when you want Start Menu, Windows Search,
+  a desktop shortcut, and an optional taskbar pin. This zip is the portable copy.
   1. Unzip this folder anywhere (keep DeckArtStudio.exe together with the _internal folder).
   2. Run DeckArtStudio.exe.
   3. Click "1. Import deck from Moxfield..." and paste a Moxfield deck link (or a deck list).
@@ -14,8 +16,9 @@ GETTING STARTED
      or hit "3. Make deck single art..." to pick Full Art, Clear Art, or another frame and rebuild every card.
      Clear Art is full-bleed like Full Art, but with no plates: white text and a black outline sit on the picture.
      "Set artist on all cards..." (toolbar) reprints one artist credit on every face without changing the frame.
-     The gallery picker opens on your Gallery, grouped by folder (click a folder heading to collapse it);
-     the "Original" tab fetches the card's official printings from Scryfall.
+     The gallery picker has Gallery, AI Recommended, and Original tabs (click a folder heading to collapse it);
+     AI Recommended lists DeckArt/generated_ai and any folder whose name ends in _ai.
+     The "Original" tab fetches the card's official printings from Scryfall.
 
 STACKS
   The "Stack:" bar under the action buttons switches between the piles in the save (the first one is
@@ -46,8 +49,9 @@ FOLDERS (all changeable in Settings (folders)... on the toolbar)
   Gemini API key      Settings. Used by the right-hand Gemini art panel in Card Maker
                       (Nano Banana 2 or Nano Banana 2 Lite). Images save even if you
                       do not click Save to deck.
-  Updates             Toolbar "Check for updates…" and an optional startup check
-                      download newer Windows zips from GitHub Releases.
+  Updates             Toolbar "Check for updates…" and a startup check (on by default)
+                      download newer Windows zips from GitHub Releases. MSI installs
+                      take the MSI when a later release includes one.
   Original art cache  Where original Scryfall card art is downloaded.
   Settings/cache      %LOCALAPPDATA%\DeckArtStudio  (settings.json, backups of every deck before
                       the first save, thumbnail cache, logs).

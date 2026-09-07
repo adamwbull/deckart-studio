@@ -74,7 +74,7 @@ class SelfTest:
                   self.check_main_window_boots, self.check_session_stacks, self.check_split_card_design,
                   self.check_custom_display_name, self.check_fullart_plates, self.check_gemini_prompt,
                   self.check_update_versioning, self.check_token_lookup, self.check_batch_artist_override,
-                  self.check_dialogs_construct]
+                  self.check_dialogs_construct, self.check_gallery_ai_tab]
         if self.online:
             checks.extend([self.check_scryfall_online, self.check_steam_cloud_upload])
         return checks
@@ -119,6 +119,8 @@ class SelfTest:
         assert (self.settings.deck_art_root() / "README.txt").exists(), "DeckArt README not created"
         assert self.settings.generated_ai_folder().is_dir(), "generated_ai folder was not created"
         assert reloaded.art_styles, "default art styles were not saved"
+        assert AppSettings.from_dict({}).check_for_updates is True, "startup update check must default on"
+        assert reloaded.check_for_updates is True, "startup update check did not persist on"
         return reloaded.deck_art_folder
 
     def check_decklist_parsing(self) -> str:
@@ -350,14 +352,45 @@ class SelfTest:
         return "prompt + image payload parse"
 
     def check_update_versioning(self) -> str:
-        from deckart_studio.updates import is_newer_version, release_zip_url, version_tuple
-        assert version_tuple("0.6.8") > version_tuple("0.6.7")
-        assert is_newer_version("0.7.0", "0.6.8")
-        assert not is_newer_version("0.6.8", "0.6.8")
-        url = release_zip_url({"assets": [{"name": "DeckArtStudio-0.6.8-win64.zip",
-                                           "browser_download_url": "https://example.invalid/app.zip"}]}, "0.6.8")
-        assert url.endswith("app.zip")
-        return "semver + release zip lookup"
+        from deckart_studio.updates import (
+            is_msi_install, is_newer_version, release_msi_url, release_zip_url, version_tuple,
+        )
+        assert version_tuple("0.6.9") > version_tuple("0.6.8")
+        assert is_newer_version("0.6.9", "0.6.8")
+        assert not is_newer_version("0.6.9", "0.6.9")
+        assets = {"assets": [
+            {"name": "DeckArtStudio-0.6.9-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.6.9-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+        ]}
+        assert release_zip_url(assets, "0.6.9").endswith("app.zip")
+        assert release_msi_url(assets, "0.6.9").endswith("app.msi")
+        marker = self.workspace / "install_kind.txt"
+        marker.write_text("msi", encoding="utf-8")
+        assert is_msi_install(self.workspace)
+        return "semver + zip/msi lookup"
+
+    def check_gallery_ai_tab(self) -> str:
+        from deckart_studio.gallery.gallery_library import GallerySection
+        from deckart_studio.ui.gallery_dock import SECTION_CHOICES
+        from deckart_studio.ui.gallery_picker_dialog import GalleryPickerDialog
+        from deckart_studio.ui.gallery_picker_panel import AI_TAB
+        image = QImage(64, 64, QImage.Format.Format_ARGB32)
+        image.fill(QColor(20, 140, 90))
+        generated = self.settings.generated_ai_folder() / "selftest_ai.png"
+        image.save(str(generated))
+        self.context.refresh_gallery()
+        dialog = GalleryPickerDialog(self.context, "AI tab", "Card back", False, self.window)
+        titles = dialog._panel.tab_titles()
+        assert any(title.startswith("AI Recommended") for title in titles), titles
+        assert any(title.startswith("Gallery") for title in titles), titles
+        assert any(title.startswith("Original") for title in titles), titles
+        dialog._panel.show_section(GallerySection.AI_RECOMMENDED)
+        assert dialog._panel._tabs.currentIndex() == AI_TAB
+        assert SECTION_CHOICES["AI Recommended"] == (GallerySection.AI_RECOMMENDED,)
+        recommended = self.context.gallery.images(GallerySection.AI_RECOMMENDED)
+        assert any(item.path == generated.resolve() for item in recommended), recommended
+        dialog.close()
+        return "AI Recommended tab, dock section, generated_ai classification"
 
     def check_token_lookup(self) -> str:
         from deckart_studio.cardmaker.token_lookup import lookup_token_card

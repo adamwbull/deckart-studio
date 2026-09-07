@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Build
         shell: pwsh
         run: |
@@ -40,10 +45,12 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.version }}"
           $zip = "dist/DeckArtStudio-$version-win64.zip"
+          $msi = "dist/DeckArtStudio-$version-win64.msi"
           if (-not (Test-Path $zip)) { throw "Missing $zip" }
+          if (-not (Test-Path $msi)) { throw "Missing $msi" }
           $tag = "v$version"
           if (gh release view $tag 2>$null) {
-            gh release upload $tag $zip --clobber
+            gh release upload $tag $zip $msi --clobber
           } else {
-            gh release create $tag $zip --title "DeckArt Studio $version" --generate-notes
+            gh release create $tag $zip $msi --title "DeckArt Studio $version" --generate-notes
           }

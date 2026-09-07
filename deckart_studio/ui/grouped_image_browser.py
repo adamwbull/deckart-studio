@@ -26,10 +26,12 @@ class GroupedImageBrowser(QWidget):
 
     sourceActivated = Signal(ImageSource)
 
-    def __init__(self, loader: ThumbnailLoader, tile_width: int = 120, parent: QWidget | None = None):
+    def __init__(self, loader: ThumbnailLoader, tile_width: int = 120, parent: QWidget | None = None,
+                 empty_hint: str = ""):
         super().__init__(parent)
         self._loader = loader
         self._tile_width = tile_width
+        self._empty_hint = empty_hint
         self._groups: list[ImageGroup] = []
         self._collapsed: set[str] = set()
         self._filter = QLineEdit(self)
@@ -79,7 +81,12 @@ class GroupedImageBrowser(QWidget):
                 budget -= min(len(matching), budget)
                 shown += len(matching)
         self._sections_layout.addStretch(1)
-        self._status.setText(describe_count(shown, self.total_count()))
+        self._status.setText(self._status_text(shown))
+
+    def _status_text(self, shown: int) -> str:
+        if self.total_count() == 0 and self._empty_hint:
+            return self._empty_hint
+        return describe_count(shown, self.total_count())
 
     def _clear_sections(self) -> None:
         while self._sections_layout.count():

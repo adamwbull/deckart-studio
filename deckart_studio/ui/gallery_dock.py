@@ -11,7 +11,8 @@ from deckart_studio.ui.drop_zone import DropZone
 from deckart_studio.ui.image_tile_grid import ImageTileGrid
 
 SECTION_CHOICES = {
-    "Gallery": (GallerySection.HANDPICKED, GallerySection.AI_RECOMMENDED),
+    "Gallery": (GallerySection.HANDPICKED,),
+    "AI Recommended": (GallerySection.AI_RECOMMENDED,),
     "Original": (GallerySection.ORIGINAL,),
 }
 
