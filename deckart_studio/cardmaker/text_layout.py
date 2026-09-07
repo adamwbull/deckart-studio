@@ -123,6 +123,13 @@ class RulesTextLayouter:
         return (italic_metrics if item.italic else metrics).horizontalAdvance(item.text)
 
 
+def laid_line_width(line: LaidLine) -> float:
+    if not line.items:
+        return 0.0
+    last = line.items[-1]
+    return last.x + last.width
+
+
 def symbol_side(size: float) -> float:
     return size * SYMBOL_SIZE_FACTOR
 

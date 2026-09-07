@@ -1,6 +1,9 @@
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+REMINDER_TEXT = re.compile(r"(?<!\*)\([^()\n]*\)(?!\*)")
 
 DEFAULT_TEMPLATE_ID = "fullart"
 DEFAULT_LEGAL_TEXT = "Custom card — not for sale. MTG is ™ & © Wizards of the Coast."
@@ -30,8 +33,24 @@ class CardDesign:
     custom_name: str = ""
     real_name: str = ""
     plate_texture_id: str = "stone"
+    plate_style_id: str = "bars"
+    chrome_mode: str = "style"
+    title_piece_path: str = ""
+    subtitle_piece_path: str = ""
+    type_piece_path: str = ""
+    text_piece_path: str = ""
     head_opacity: float = 0.92
     body_opacity: float = 0.92
+    center_title: bool = False
+    center_subtitle: bool = True
+    center_description: bool = False
+    title_color: str = ""
+    subtitle_color: str = ""
+    type_color: str = ""
+    rules_color: str = ""
+    pt_color: str = ""
+    artist_color: str = ""
+    legal_color: str = ""
     notes: dict = field(default_factory=dict)
 
     def is_creature(self) -> bool:
@@ -138,6 +157,36 @@ def ensure_real_name(design: CardDesign, fallback: str) -> None:
         design.real_name = fallback.strip()
 
 
+CHROME_FIELDS = (
+    "plate_texture_id", "plate_style_id", "chrome_mode",
+    "title_piece_path", "subtitle_piece_path", "type_piece_path", "text_piece_path",
+    "head_opacity", "body_opacity",
+    "center_title", "center_subtitle", "center_description",
+    "title_color", "subtitle_color", "type_color", "rules_color", "pt_color",
+    "artist_color", "legal_color", "art_zoom", "art_offset_x", "art_offset_y",
+    "use_custom_name", "custom_name",
+)
+
+CHROME_STYLE = "style"
+CHROME_PIECES = "pieces"
+PIECE_FIELDS = {
+    "title": "title_piece_path",
+    "subtitle": "subtitle_piece_path",
+    "type": "type_piece_path",
+    "text": "text_piece_path",
+}
+
+
+def piece_path_for(design: CardDesign, kind: str) -> str:
+    field = PIECE_FIELDS.get(kind)
+    return getattr(design, field) if field else ""
+
+
+def copy_maker_chrome(source: CardDesign, destination: CardDesign) -> None:
+    for field_name in CHROME_FIELDS:
+        setattr(destination, field_name, getattr(source, field_name))
+
+
 def is_split_design(design: CardDesign) -> bool:
     return " // " in design.mana_cost and " // " in design.name
 
@@ -158,12 +207,57 @@ def front_face_data(card: dict) -> dict:
     return faces[0] if faces else card
 
 
+def italicize_reminder_text(text: str) -> str:
+    return REMINDER_TEXT.sub(_wrap_in_asterisks, text)
+
+
+def _wrap_in_asterisks(match: re.Match) -> str:
+    return f"*{match.group(0)}*"
+
+
+def italicize_flavor_text(flavor: str) -> str:
+    return "\n".join(italicize_imported_line(line) for line in flavor.splitlines())
+
+
+def italicize_imported_line(line: str) -> str:
+    stripped = line.strip()
+    if not stripped or is_already_italic_line(stripped):
+        return line
+    return f"*{line}*"
+
+
+def is_already_italic_line(stripped: str) -> bool:
+    return stripped.startswith("*") and stripped.endswith("*") and len(stripped) > 1
+
+
+def looks_like_flavor_line(stripped: str) -> bool:
+    return stripped[:1] in {"\"", "“", "«"} or stripped.startswith(("—", "–"))
+
+
+def italicize_flavor_looking_lines(text: str) -> str:
+    return "\n".join(maybe_italicize_flavor_line(line) for line in text.splitlines())
+
+
+def maybe_italicize_flavor_line(line: str) -> str:
+    stripped = line.strip()
+    if not stripped or is_already_italic_line(stripped) or not looks_like_flavor_line(stripped):
+        return line
+    return f"*{line}*"
+
+
+def format_imported_rules(rules: str) -> str:
+    return italicize_flavor_looking_lines(italicize_reminder_text(rules)).strip()
+
+
 def rules_with_flavor(face: dict) -> str:
-    oracle = face.get("oracle_text", "")
+    oracle = format_imported_rules(face.get("oracle_text", ""))
     flavor = face.get("flavor_text", "")
-    if flavor:
-        return f"{oracle}\n*{flavor}*" if oracle else f"*{flavor}*"
-    return oracle
+    if not flavor:
+        return oracle
+    marked_flavor = italicize_flavor_text(flavor)
+    if oracle:
+        return f"{oracle}\n{marked_flavor}"
+    return marked_flavor
 
 
 def infer_frame_color(card: dict, face: dict) -> str:

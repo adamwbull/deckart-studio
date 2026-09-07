@@ -6,6 +6,12 @@ from PySide6.QtCore import QRect
 from PySide6.QtGui import QImage
 
 TEMPLATE_FILENAME = "template.json"
+COLOR_ALIASES = {
+    "vehicle": "artifact",
+    "oldArtifact": "artifact",
+    "oldGold": "gold",
+    "oldGoldLand": "goldLand",
+}
 
 
 @dataclass
@@ -57,10 +63,16 @@ class CardTemplate:
             _art_window=explicit_art_window(raw.get("art_window")),
         )
 
-    def color(self, color_id: str) -> FrameColor:
+    def resolve_color_id(self, color_id: str) -> str:
         if color_id in self.colors:
-            return self.colors[color_id]
-        return next(iter(self.colors.values()))
+            return color_id
+        alias = COLOR_ALIASES.get(color_id)
+        if alias in self.colors:
+            return alias
+        return next(iter(self.colors))
+
+    def color(self, color_id: str) -> FrameColor:
+        return self.colors[self.resolve_color_id(color_id)]
 
     def color_ids(self) -> list[str]:
         return list(self.colors.keys())

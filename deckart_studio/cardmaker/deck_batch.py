@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from deckart_studio.cardmaker.card_design import DEFAULT_TEMPLATE_ID, CardDesign, design_from_scryfall
+from deckart_studio.cardmaker.card_design import DEFAULT_TEMPLATE_ID, CardDesign, design_from_scryfall, format_imported_rules
 from deckart_studio.cardmaker.card_lookup import CardLookup
 from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, CardRenderer
 from deckart_studio.cardmaker.design_store import DesignStore
@@ -111,7 +111,7 @@ class DeckFaceBatch:
             return design_from_scryfall(scryfall_card, template_id)
         lines = card.description.splitlines()
         return CardDesign(template_id=template_id, name=card.nickname, type_line=lines[0] if lines else "",
-                          rules_text="\n".join(lines[1:]).strip())
+                          rules_text=format_imported_rules("\n".join(lines[1:])))
 
     def _art_for(self, card: BatchCard, design: CardDesign, scryfall_card: dict | None) -> str:
         if card.source_art_path is not None and card.source_art_path.exists():

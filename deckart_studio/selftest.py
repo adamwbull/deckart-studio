@@ -73,7 +73,8 @@ class SelfTest:
                   self.check_publish_url_rewrite, self.check_unreachable_host_detection, self.check_tts_url_sanitizing,
                   self.check_steam_detection,
                   self.check_main_window_boots, self.check_session_stacks, self.check_split_card_design,
-                  self.check_custom_display_name, self.check_fullart_plates, self.check_gemini_prompt,
+                  self.check_custom_display_name, self.check_imported_italics, self.check_fullart_plates,
+                  self.check_fullart_chrome, self.check_gemini_prompt,
                   self.check_update_versioning, self.check_token_lookup, self.check_batch_artist_override,
                   self.check_dialogs_construct, self.check_gallery_ai_tab]
         if self.online:
@@ -329,7 +330,40 @@ class SelfTest:
         assert primary == "River's Trick" and subtitle == "Dovin's Veto", (primary, subtitle)
         image = CardRenderer(self.assets).render(design, EXPORT_SCALE)
         assert not image.isNull(), "display-name-only custom card did not render"
+        design.template_id = "fullart"
+        design.center_title = True
+        design.center_subtitle = True
+        design.center_description = True
+        assert not CardRenderer(self.assets).render(design, EXPORT_SCALE).isNull(), "centered full art names did not render"
+        assert design.center_subtitle is True
         return f"{design.name} over {design.real_name}"
+
+    def check_imported_italics(self) -> str:
+        from deckart_studio.cardmaker.card_design import format_imported_rules, rules_with_flavor
+        from deckart_studio.cardmaker.text_layout import WordItem, tokenize_paragraph
+        from deckart_studio.ui.card_maker_dialog import split_description
+
+        reminder = format_imported_rules("Flying (This creature can't be blocked except by creatures with flying or reach.)")
+        assert "*(This creature can't be blocked except by creatures with flying or reach.)*" in reminder, reminder
+        type_line, imported = split_description(
+            'Creature — Human\nFlying (This creature can\'t be blocked.)\n"A remembered line."\n— Himmel'
+        )
+        assert type_line == "Creature — Human"
+        assert "*(This creature can't be blocked.)*" in imported, imported
+        assert '*"A remembered line."*' in imported, imported
+        assert "*— Himmel*" in imported, imported
+        combined = rules_with_flavor({
+            "oracle_text": "Flying (This creature can't be blocked.)",
+            "flavor_text": '"Line one."\n— Name',
+        })
+        assert "*(This creature can't be blocked.)*" in combined, combined
+        assert '*"Line one."*' in combined, combined
+        assert "*— Name*" in combined, combined
+        words = [item for item in tokenize_paragraph("*(This creature can't be blocked.)*") if isinstance(item, WordItem)]
+        assert words and all(item.italic for item in words), words
+        twice = format_imported_rules(reminder)
+        assert twice == reminder, twice
+        return "reminder and flavor italics applied on import"
 
     def check_fullart_plates(self) -> str:
         from deckart_studio.cardmaker.card_renderer import CardRenderer, EXPORT_SCALE
@@ -351,6 +385,46 @@ class SelfTest:
         count = len(self.assets.plate_textures.list())
         assert count >= 8, count
         return f"{count} photographic plate sheets, stone + granite OK"
+
+    def check_fullart_chrome(self) -> str:
+        from deckart_studio.cardmaker.fullart_styles import plate_style_list
+        from deckart_studio.cardmaker.plate_geometry import TITLE_PLATE
+        renderer = CardRenderer(self.assets)
+        art = self._synthetic_art()
+        rendered = []
+        for style in plate_style_list():
+            design = sample_design("fullart", art)
+            design.plate_style_id = style.id
+            design.color_id = "blue"
+            image = renderer.render(design, EXPORT_SCALE)
+            assert not image.isNull(), style.id
+            rendered.append((style.id, image))
+        blue = sample_design("fullart", art)
+        blue.color_id = "blue"
+        red = sample_design("fullart", art)
+        red.color_id = "red"
+        blue_pixel = title_plate_sample(renderer.render(blue, EXPORT_SCALE))
+        red_pixel = title_plate_sample(renderer.render(red, EXPORT_SCALE))
+        assert blue_pixel != red_pixel, (blue_pixel, red_pixel)
+        inked = sample_design("fullart", art)
+        inked.title_color = "#ff00aa"
+        default_pixel = title_name_sample(renderer.render(blue, EXPORT_SCALE))
+        pink_pixel = title_name_sample(renderer.render(inked, EXPORT_SCALE))
+        assert pink_pixel != default_pixel, (pink_pixel, default_pixel)
+        eighth = self.assets.template("8th")
+        assert eighth.resolve_color_id("vehicle") == "artifact", eighth.resolve_color_id("vehicle")
+        assert TITLE_PLATE.width() > 0
+        from deckart_studio.cardmaker.card_design import CHROME_PIECES
+        piece = QImage(int(TITLE_PLATE.width()), int(TITLE_PLATE.height()), QImage.Format.Format_ARGB32)
+        piece.fill(QColor(255, 0, 0))
+        piece_path = self.workspace / "title-piece.png"
+        piece.save(str(piece_path))
+        custom = sample_design("fullart", art)
+        custom.chrome_mode = CHROME_PIECES
+        custom.title_piece_path = str(piece_path)
+        red = title_plate_sample(renderer.render(custom, EXPORT_SCALE))
+        assert red[0] > 180 and red[0] > red[1] and red[0] > red[2], red
+        return f"{len(rendered)} plate styles, frame tint, text color, and custom title piece"
 
     def check_gemini_prompt(self) -> str:
         from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles
@@ -399,15 +473,15 @@ class SelfTest:
             is_msi_install, is_newer_version, release_msi_url, release_zip_url, update_download_folder,
             updater_process_flags, version_tuple, write_msi_updater_script,
         )
-        assert version_tuple("0.7.4") > version_tuple("0.7.3")
-        assert is_newer_version("0.7.4", "0.6.9")
-        assert not is_newer_version("0.7.4", "0.7.4")
+        assert version_tuple("0.7.5") > version_tuple("0.7.4")
+        assert is_newer_version("0.7.5", "0.6.9")
+        assert not is_newer_version("0.7.5", "0.7.5")
         assets = {"assets": [
-            {"name": "DeckArtStudio-0.7.4-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
-            {"name": "DeckArtStudio-0.7.4-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
+            {"name": "DeckArtStudio-0.7.5-win64.zip", "browser_download_url": "https://example.invalid/app.zip"},
+            {"name": "DeckArtStudio-0.7.5-win64.msi", "browser_download_url": "https://example.invalid/app.msi"},
         ]}
-        assert release_zip_url(assets, "0.7.4").endswith("app.zip")
-        assert release_msi_url(assets, "0.7.4").endswith("app.msi")
+        assert release_zip_url(assets, "0.7.5").endswith("app.zip")
+        assert release_msi_url(assets, "0.7.5").endswith("app.msi")
         assert update_download_folder().name == "DeckArtStudioUpdates"
         assert update_download_folder(self.workspace).resolve() == self.workspace.resolve()
         marker = self.workspace / "install_kind.txt"
@@ -519,6 +593,21 @@ def assert_deck_objects_consistent(document: DeckDocument) -> None:
         state = board.container
         assert state["DeckIDs"] == [card.card_id for card in board.cards], (board.name, state["DeckIDs"])
         assert set(state["CustomDeck"]) == {str(card.sheet_id) for card in board.cards}, (board.name, state["CustomDeck"].keys())
+
+
+def title_plate_sample(image: QImage) -> tuple[int, int, int]:
+    from deckart_studio.cardmaker.plate_geometry import TITLE_PLATE
+    x = int((TITLE_PLATE.left() + 8) * EXPORT_SCALE)
+    y = int((TITLE_PLATE.center().y()) * EXPORT_SCALE)
+    color = image.pixelColor(x, y)
+    return color.red(), color.green(), color.blue()
+
+
+def title_name_sample(image: QImage) -> tuple[int, int, int]:
+    x = int(90 * EXPORT_SCALE)
+    y = int(62 * EXPORT_SCALE)
+    color = image.pixelColor(x, y)
+    return color.red(), color.green(), color.blue()
 
 
 def texture_grain(image: QImage) -> float:

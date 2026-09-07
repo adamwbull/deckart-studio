@@ -7,9 +7,14 @@ from PySide6.QtWidgets import (
     QPlainTextEdit, QPushButton, QScrollArea, QSlider, QSplitter, QVBoxLayout, QWidget,
 )
 
-from deckart_studio.cardmaker.card_design import CardDesign, design_from_scryfall, ensure_real_name
+from deckart_studio.cardmaker.card_design import (
+    CHROME_PIECES, CHROME_STYLE, PIECE_FIELDS, CardDesign, copy_maker_chrome, design_from_scryfall,
+    ensure_real_name, format_imported_rules,
+)
 from deckart_studio.cardmaker.card_lookup import CardLookup
 from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, PREVIEW_SCALE
+from deckart_studio.cardmaker.fullart_styles import plate_style_list
+from deckart_studio.cardmaker.text_colors import TEXT_ROLES, default_text_colors, hex_for_swatch
 from deckart_studio.gallery.thumbnail_loader import resolve_source_path
 from deckart_studio.image_source import ImageSource
 from deckart_studio.tts.card_face import CardFace
@@ -17,7 +22,9 @@ from deckart_studio.gemini.image_client import CardArtContext
 from deckart_studio.ui.ai_art_panel import AiArtPanel
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.card_name_search import CardNameSearch
+from deckart_studio.ui.color_swatch import ColorSwatch
 from deckart_studio.ui.drop_zone import DropZone
+from deckart_studio.ui.piece_slot_row import PieceSlotRow
 from deckart_studio.ui.gallery_picker_dialog import pick_image_for_card
 from deckart_studio.ui.styles import PRIMARY_BUTTON_STYLE
 from deckart_studio.ui.symbol_palette import SymbolPalette
@@ -58,6 +65,9 @@ class CardMakerDialog(QDialog):
         self._name = QLineEdit(self.design.name)
         self._name_label = QLabel("Card name")
         self._use_custom_name = QCheckBox("Custom display name")
+        self._center_title = QCheckBox("Center main name")
+        self._center_subtitle = QCheckBox("Center custom name")
+        self._center_description = QCheckBox("Center description box")
         self._custom_name = QLineEdit(self.design.custom_name)
         self._custom_name.setEnabled(False)
         self._custom_name.setPlaceholderText("Optional — overrides display name when filled")
@@ -77,9 +87,14 @@ class CardMakerDialog(QDialog):
         self._offset_x = QSlider(Qt.Orientation.Horizontal)
         self._offset_y = QSlider(Qt.Orientation.Horizontal)
         self._plate_texture = QComboBox()
+        self._plate_style = QComboBox()
+        self._chrome_mode = QComboBox()
         self._plate_opacity = QSlider(Qt.Orientation.Horizontal)
         self._plate_opacity_label = QLabel()
         self._plate_panel = QWidget()
+        self._pieces_panel = QWidget()
+        self._piece_rows = {kind: PieceSlotRow() for kind in PIECE_FIELDS}
+        self._swatches = self._make_swatches()
         self._palette = SymbolPalette(self.context.card_assets)
         self._ai_panel = AiArtPanel(self.context)
         self._populate_choice_widgets()
@@ -91,6 +106,9 @@ class CardMakerDialog(QDialog):
         self._refresh_color_choices()
         self._crown.setChecked(self.design.show_legendary_crown)
         self._use_custom_name.setChecked(self.design.use_custom_name)
+        self._center_title.setChecked(self.design.center_title)
+        self._center_subtitle.setChecked(self.design.center_subtitle)
+        self._center_description.setChecked(self.design.center_description)
         self._custom_name.setText(self.design.custom_name)
         self._custom_name.setEnabled(self.design.use_custom_name)
         self._real_name.setText(self.design.real_name)
@@ -106,11 +124,25 @@ class CardMakerDialog(QDialog):
         self._mana.setPlaceholderText("{2}{U}{U}")
         self._search.set_text(self.card.nickname)
         self._populate_plate_texture_choices()
+        self._populate_plate_style_choices()
+        self._populate_chrome_mode()
+        self._load_piece_rows_from_design()
         self._plate_opacity.setRange(40, 100)
         self._plate_opacity.setValue(int(max(self.design.head_opacity, self.design.body_opacity) * OPACITY_SLIDER_SCALE))
         self._update_opacity_labels()
         self._refresh_plate_panel_visibility()
+        self._refresh_chrome_mode_ui()
+        self._style_default_colors = self._current_default_text_colors()
         self._update_art_label()
+
+    def _make_swatches(self) -> dict[str, ColorSwatch]:
+        template = self.context.card_assets.template(self.design.template_id)
+        swatches = {}
+        for role in TEXT_ROLES:
+            swatch = ColorSwatch(hex_for_swatch(self.design, template, role))
+            swatch.colorChanged.connect(self.schedule_preview)
+            swatches[role] = swatch
+        return swatches
 
     def _populate_plate_texture_choices(self) -> None:
         self._plate_texture.blockSignals(True)
@@ -121,6 +153,28 @@ class CardMakerDialog(QDialog):
         self._plate_texture.setCurrentIndex(index)
         self._plate_texture.blockSignals(False)
 
+    def _populate_plate_style_choices(self) -> None:
+        self._plate_style.blockSignals(True)
+        self._plate_style.clear()
+        for style in plate_style_list():
+            self._plate_style.addItem(style.label, style.id)
+        index = max(0, self._plate_style.findData(self.design.plate_style_id))
+        self._plate_style.setCurrentIndex(index)
+        self._plate_style.blockSignals(False)
+
+    def _populate_chrome_mode(self) -> None:
+        self._chrome_mode.blockSignals(True)
+        self._chrome_mode.clear()
+        self._chrome_mode.addItem("Built-in styles", CHROME_STYLE)
+        self._chrome_mode.addItem("Custom pieces", CHROME_PIECES)
+        index = max(0, self._chrome_mode.findData(self.design.chrome_mode))
+        self._chrome_mode.setCurrentIndex(index)
+        self._chrome_mode.blockSignals(False)
+
+    def _load_piece_rows_from_design(self) -> None:
+        for kind, field in PIECE_FIELDS.items():
+            self._piece_rows[kind].set_path(getattr(self.design, field))
+
     def _update_opacity_labels(self) -> None:
         self._plate_opacity_label.setText(f"{self._plate_opacity.value()}%")
 
@@ -130,12 +184,14 @@ class CardMakerDialog(QDialog):
 
     def _refresh_color_choices(self) -> None:
         template = self.context.card_assets.template(self._template.currentData())
+        resolved = template.resolve_color_id(self.design.color_id)
         self._color.blockSignals(True)
         self._color.clear()
         for color in template.colors.values():
             self._color.addItem(color.label, color.id)
-        self._color.setCurrentIndex(max(0, self._color.findData(self.design.color_id)))
+        self._color.setCurrentIndex(max(0, self._color.findData(resolved)))
         self._color.blockSignals(False)
+        self.design.color_id = self._color.currentData() or resolved
 
     def _build_layout(self) -> None:
         splitter = QSplitter(Qt.Orientation.Horizontal, self)
@@ -154,21 +210,24 @@ class CardMakerDialog(QDialog):
         form.addRow("Template", self._template)
         form.addRow("Frame color", self._color)
         form.addRow("", self._plate_options_panel())
-        form.addRow(self._name_label, self._name)
+        form.addRow(self._name_label, self._with_swatch(self._name, "title"))
         form.addRow("", self._use_custom_name)
-        form.addRow("Custom name", self._custom_name)
+        form.addRow("Custom name", self._with_swatch(self._custom_name, "subtitle"))
         form.addRow("Real card name", self._real_name)
+        form.addRow("", self._center_title)
+        form.addRow("", self._center_subtitle)
+        form.addRow("", self._center_description)
         form.addRow("Artwork", self._artwork_controls())
         form.addRow("Art zoom", self._zoom)
         form.addRow("Art X", self._offset_x)
         form.addRow("Art Y", self._offset_y)
         form.addRow("Mana cost", self._mana)
-        form.addRow("Type line", self._type)
-        form.addRow("Rules text", self._rules)
+        form.addRow("Type line", self._with_swatch(self._type, "type"))
+        form.addRow("Rules text", self._with_swatch(self._rules, "rules"))
         form.addRow("Click to insert a symbol", self._palette)
-        form.addRow("Power / Toughness", self._power_toughness_row())
-        form.addRow("Legal text", self._legal)
-        form.addRow("Artist", self._artist)
+        form.addRow("Power / Toughness", self._with_swatch(self._power_toughness_row(), "pt"))
+        form.addRow("Legal text", self._with_swatch(self._legal, "legal"))
+        form.addRow("Artist", self._with_swatch(self._artist, "artist"))
         form.addRow("", self._crown)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -183,9 +242,35 @@ class CardMakerDialog(QDialog):
         opacity_layout.setContentsMargins(0, 0, 0, 0)
         opacity_layout.addWidget(self._plate_opacity, 1)
         opacity_layout.addWidget(self._plate_opacity_label)
+        layout.addRow("Chrome", self._chrome_mode)
+        layout.addRow("Plate style", self._plate_style)
         layout.addRow("Plate texture", self._plate_texture)
         layout.addRow("Plate opacity", opacity_row)
+        layout.addRow(self._pieces_options_panel())
         return self._plate_panel
+
+    def _pieces_options_panel(self) -> QWidget:
+        layout = QFormLayout(self._pieces_panel)
+        layout.setContentsMargins(0, 8, 0, 0)
+        note = QLabel("Empty slots keep the plate style above. Card-sized PNGs align to the whole face.")
+        note.setWordWrap(True)
+        layout.addRow(note)
+        layout.addRow("Title bar", self._piece_rows["title"])
+        layout.addRow("Custom name bar", self._piece_rows["subtitle"])
+        layout.addRow("Type line", self._piece_rows["type"])
+        layout.addRow("Rules box", self._piece_rows["text"])
+        return self._pieces_panel
+
+    def _refresh_chrome_mode_ui(self) -> None:
+        self._pieces_panel.setVisible(self._chrome_mode.currentData() == CHROME_PIECES)
+
+    def _with_swatch(self, widget: QWidget, role: str) -> QWidget:
+        host = QWidget()
+        row = QHBoxLayout(host)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(widget, 1)
+        row.addWidget(self._swatches[role], 0, Qt.AlignmentFlag.AlignTop)
+        return host
 
     @staticmethod
     def _search_heading() -> QLabel:
@@ -258,7 +343,14 @@ class CardMakerDialog(QDialog):
         self._rules.textChanged.connect(self.schedule_preview)
         self._crown.toggled.connect(self.schedule_preview)
         self._use_custom_name.toggled.connect(self._on_custom_name_toggled)
+        self._center_title.toggled.connect(self.schedule_preview)
+        self._center_subtitle.toggled.connect(self.schedule_preview)
+        self._center_description.toggled.connect(self.schedule_preview)
         self._plate_texture.currentIndexChanged.connect(self.schedule_preview)
+        self._plate_style.currentIndexChanged.connect(self._on_plate_style_changed)
+        self._chrome_mode.currentIndexChanged.connect(self._on_chrome_mode_changed)
+        for row in self._piece_rows.values():
+            row.pathChanged.connect(self.schedule_preview)
         self._plate_opacity.valueChanged.connect(self._on_plate_opacity_changed)
         for slider in (self._zoom, self._offset_x, self._offset_y):
             slider.valueChanged.connect(self.schedule_preview)
@@ -322,7 +414,36 @@ class CardMakerDialog(QDialog):
         self.design.color_id = self._color.currentData() or self.design.color_id
         self._refresh_color_choices()
         self._refresh_plate_panel_visibility()
+        if self.context.card_assets.template(self._template.currentData()).is_fullart():
+            self._center_subtitle.setChecked(True)
+        self._sync_text_color_defaults()
         self.schedule_preview()
+
+    def _on_plate_style_changed(self) -> None:
+        self.design.plate_style_id = self._plate_style.currentData() or self.design.plate_style_id
+        self._sync_text_color_defaults()
+        self.schedule_preview()
+
+    def _on_chrome_mode_changed(self) -> None:
+        self.design.chrome_mode = self._chrome_mode.currentData() or CHROME_STYLE
+        self._refresh_chrome_mode_ui()
+        self.schedule_preview()
+
+    def _current_default_text_colors(self) -> dict[str, str]:
+        template = self.context.card_assets.template(self._template.currentData() or self.design.template_id)
+        style_id = self._plate_style.currentData() or self.design.plate_style_id
+        return default_text_colors(template.style, style_id)
+
+    def _sync_text_color_defaults(self) -> None:
+        fresh = self._current_default_text_colors()
+        previous = getattr(self, "_style_default_colors", {})
+        for role, hex_color in fresh.items():
+            swatch = self._swatches[role]
+            stored = getattr(self.design, f"{role}_color")
+            if not stored or swatch.hex().lower() == previous.get(role, "").lower():
+                swatch.set_hex(hex_color)
+                setattr(self.design, f"{role}_color", hex_color)
+        self._style_default_colors = fresh
 
     def _on_focus_changed(self, _old: QWidget | None, new: QWidget | None) -> None:
         if new in (self._mana, self._rules):
@@ -364,6 +485,7 @@ class CardMakerDialog(QDialog):
     def _on_scryfall_card(self, card: object) -> None:
         fetched = design_from_scryfall(card, self._template.currentData())
         fetched.art_path, fetched.legal_text = self.design.art_path, self.design.legal_text
+        copy_maker_chrome(self.design, fetched)
         self.design = fetched
         self._load_design_into_widgets()
         self._status.setText(f"Filled from Scryfall: {fetched.name}")
@@ -390,21 +512,36 @@ class CardMakerDialog(QDialog):
         self._custom_name.setText(self.design.custom_name)
         self._real_name.setText(self.design.real_name)
         self._use_custom_name.setChecked(self.design.use_custom_name)
+        self._center_title.setChecked(self.design.center_title)
+        self._center_subtitle.setChecked(self.design.center_subtitle)
+        self._center_description.setChecked(self.design.center_description)
         self._custom_name.setEnabled(self.design.use_custom_name)
         self._real_name.setEnabled(self.design.use_custom_name)
         self._refresh_name_field_labels()
         self._populate_plate_texture_choices()
+        self._populate_plate_style_choices()
+        self._populate_chrome_mode()
+        self._load_piece_rows_from_design()
         self._plate_opacity.setValue(int(max(self.design.head_opacity, self.design.body_opacity) * OPACITY_SLIDER_SCALE))
         self._update_opacity_labels()
         self._refresh_plate_panel_visibility()
+        self._refresh_chrome_mode_ui()
+        self._style_default_colors = self._current_default_text_colors()
+        self._load_swatches_from_design()
         self._mana.setText(self.design.mana_cost)
         self._type.setText(self.design.type_line)
         self._rules.setPlainText(self.design.rules_text)
         self._power.setText(self.design.power)
         self._toughness.setText(self.design.toughness)
         self._artist.setText(self.design.artist)
+        self._legal.setText(self.design.legal_text)
         self._refresh_color_choices()
         self.schedule_preview()
+
+    def _load_swatches_from_design(self) -> None:
+        template = self.context.card_assets.template(self._template.currentData() or self.design.template_id)
+        for role, swatch in self._swatches.items():
+            swatch.set_hex(hex_for_swatch(self.design, template, role))
 
     def _read_widgets_into_design(self) -> CardDesign:
         self.design.template_id = self._template.currentData() or self.design.template_id
@@ -416,6 +553,11 @@ class CardMakerDialog(QDialog):
         self.design.custom_name = self._custom_name.text()
         self.design.real_name = self._real_name.text() if self.design.use_custom_name else name
         self.design.plate_texture_id = self._plate_texture.currentData() or "stone"
+        self.design.plate_style_id = self._plate_style.currentData() or "bars"
+        self.design.chrome_mode = self._chrome_mode.currentData() or CHROME_STYLE
+        for kind, field in PIECE_FIELDS.items():
+            setattr(self.design, field, self._piece_rows[kind].path())
+        self._write_swatches_into_design()
         opacity = self._plate_opacity.value() / OPACITY_SLIDER_SCALE
         self.design.head_opacity = opacity
         self.design.body_opacity = opacity
@@ -423,9 +565,16 @@ class CardMakerDialog(QDialog):
         self.design.power, self.design.toughness = self._power.text(), self._toughness.text()
         self.design.artist, self.design.legal_text = self._artist.text(), self._legal.text()
         self.design.show_legendary_crown = self._crown.isChecked()
+        self.design.center_title = self._center_title.isChecked()
+        self.design.center_subtitle = self._center_subtitle.isChecked()
+        self.design.center_description = self._center_description.isChecked()
         self.design.art_zoom = self._zoom.value() / ZOOM_SLIDER_SCALE
         self.design.art_offset_x, self.design.art_offset_y = float(self._offset_x.value()), float(self._offset_y.value())
         return self.design
+
+    def _write_swatches_into_design(self) -> None:
+        for role, swatch in self._swatches.items():
+            setattr(self.design, f"{role}_color", swatch.hex())
 
     def schedule_preview(self) -> None:
         self._preview_timer.start(PREVIEW_DEBOUNCE_MS)
@@ -478,7 +627,7 @@ def split_description(description: str) -> tuple[str, str]:
     lines = description.strip().splitlines()
     if not lines:
         return "", ""
-    return lines[0].strip(), "\n".join(line for line in lines[1:]).strip()
+    return lines[0].strip(), format_imported_rules("\n".join(lines[1:]))
 
 
 def design_card_face(context: AppContext, card: CardFace, parent: QWidget | None) -> ImageSource | None:

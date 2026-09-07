@@ -109,6 +109,13 @@
       "radius": 17.5,
       "step": 39
     },
+    "subtitle": {
+      "x": 54,
+      "y": 108,
+      "font": "Beleren Bold",
+      "size": 20,
+      "spacing": 0.05
+    },
     "type": {
       "x": 58,
       "y": 641,

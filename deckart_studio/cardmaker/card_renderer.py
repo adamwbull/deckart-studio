@@ -10,12 +10,15 @@ from deckart_studio.cardmaker.card_design import (
 )
 from deckart_studio.cardmaker.card_template import CardTemplate
 from deckart_studio.cardmaker.fullart_plates import paint_fullart_overlay
+from deckart_studio.cardmaker.fullart_styles import tint_for_frame_color
+from deckart_studio.cardmaker.plate_geometry import PLATE_RIGHT, PLATE_TEXT_INSET, SUBTITLE_TEXT_Y
+from deckart_studio.cardmaker.text_colors import resolved_text_color
 from deckart_studio.cardmaker.symbols import mana_cost_tokens
 from deckart_studio.cardmaker.text_layout import (
-    RulesTextLayouter, SymbolItem, WordItem, font_factory_for, symbol_side,
+    RulesTextLayouter, SymbolItem, WordItem, font_factory_for, laid_line_width, symbol_side,
 )
 
-PREVIEW_SCALE = 1.0
+PREVIEW_SCALE = 2.0
 EXPORT_SCALE = 2.0
 ART_BACKGROUND = QColor(20, 20, 24)
 BORDER_COLOR = QColor(0, 0, 0)
@@ -90,9 +93,9 @@ class CardRenderer:
         paint_fullart_overlay(
             painter,
             self.assets.plate_textures,
-            design.plate_texture_id,
-            design.head_opacity,
-            design.body_opacity,
+            design,
+            tint_for_frame_color(design.color_id),
+            self.assets.image,
         )
 
     def _paint_mana_cost(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
@@ -156,9 +159,11 @@ class CardRenderer:
             self._paint_split_titles(painter, design, template)
         else:
             self._paint_single_title(painter, design, template)
-        type_limit = template.canvas_width - float(template.layout.get("type", {}).get("x", 62)) - 100
-        self._paint_single_line(painter, design.type_line, template.layout.get("type", {}), type_limit, template,
-                               CLEAR_OUTLINE_BODY)
+        type_spec = template.layout.get("type", {})
+        type_limit = template.canvas_width - float(type_spec.get("x", 62)) - 100
+        self._paint_single_line(painter, design.type_line, type_spec, type_limit, template,
+                               CLEAR_OUTLINE_BODY, design.center_description,
+                               resolved_text_color(design, template, "type"))
 
     def _paint_custom_display_titles(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
         primary, subtitle = custom_display_title(design)
@@ -181,15 +186,14 @@ class CardRenderer:
         main_spec = dict(title_spec)
         main_font = self._font_fitting(main_spec.get("font", "Beleren Bold"), main_size, primary,
                                        title_limit, main_spec.get("spacing", 0.0))
-        self._paint_single_line(painter, primary, main_spec, title_limit, template, CLEAR_OUTLINE_TITLE)
+        self._paint_single_line(painter, primary, main_spec, title_limit, template, CLEAR_OUTLINE_TITLE,
+                               design.center_title, resolved_text_color(design, template, "title"))
         if not subtitle:
             return
-        main_metrics = QFontMetricsF(main_font)
-        subtitle_size = max(17.0, main_size * CUSTOM_NAME_SUBTITLE_SIZE_RATIO)
-        subtitle_spec = dict(title_spec)
-        subtitle_spec["size"] = subtitle_size
-        subtitle_spec["y"] = base_y + main_metrics.ascent() + main_metrics.descent() + CUSTOM_NAME_SUBTITLE_GAP
-        self._paint_single_line(painter, subtitle, subtitle_spec, title_limit, template, CLEAR_OUTLINE_BODY)
+        subtitle_spec, subtitle_limit = self._subtitle_layout(template, title_spec, base_y, main_font,
+                                                             title_limit, main_size)
+        self._paint_single_line(painter, subtitle, subtitle_spec, subtitle_limit, template, CLEAR_OUTLINE_BODY,
+                               design.center_subtitle, resolved_text_color(design, template, "subtitle"))
 
     def _paint_single_title(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
         mana_spec = template.layout.get("mana", {})
@@ -198,7 +202,8 @@ class CardRenderer:
                                    mana_step)
         title_limit = template.canvas_width - float(template.layout.get("title", {}).get("x", 62)) - mana_width - 28
         self._paint_single_line(painter, design.name, template.layout.get("title", {}), title_limit, template,
-                               CLEAR_OUTLINE_TITLE)
+                               CLEAR_OUTLINE_TITLE, design.center_title,
+                               resolved_text_color(design, template, "title"))
 
     def _paint_split_titles(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
         names, manas, _ = split_design_parts(design)
@@ -215,14 +220,32 @@ class CardRenderer:
             title_limit = right - base_x - mana_width - 16
             spec = dict(title_spec)
             spec["y"] = base_y + row * SPLIT_TITLE_ROW_STEP
-            self._paint_single_line(painter, name, spec, title_limit, template, CLEAR_OUTLINE_TITLE)
+            self._paint_single_line(painter, name, spec, title_limit, template, CLEAR_OUTLINE_TITLE,
+                                   design.center_title, resolved_text_color(design, template, "title"))
+
+    def _subtitle_layout(self, template: CardTemplate, title_spec: dict, base_y: float, main_font,
+                         title_limit: float, main_size: float) -> tuple[dict, float]:
+        subtitle_spec = dict(template.layout.get("subtitle", title_spec))
+        subtitle_spec["size"] = max(17.0, float(subtitle_spec.get("size", main_size * CUSTOM_NAME_SUBTITLE_SIZE_RATIO)))
+        if template.is_fullart():
+            subtitle_spec["x"] = float(subtitle_spec.get("x", PLATE_TEXT_INSET + 38))
+            subtitle_spec["y"] = float(subtitle_spec.get("y", SUBTITLE_TEXT_Y))
+            return subtitle_spec, PLATE_RIGHT - float(subtitle_spec["x"]) - PLATE_TEXT_INSET
+        metrics = QFontMetricsF(main_font)
+        subtitle_spec["y"] = base_y + metrics.ascent() + metrics.descent() + CUSTOM_NAME_SUBTITLE_GAP
+        subtitle_spec.setdefault("x", title_spec.get("x", 62))
+        return subtitle_spec, title_limit
 
     def _paint_single_line(self, painter: QPainter, text: str, spec: dict, max_width: float,
-                           template: CardTemplate, outline_width: float) -> None:
+                           template: CardTemplate, outline_width: float, centered: bool = False,
+                           fill: QColor | None = None) -> None:
         size = float(spec.get("size", 40))
         font = self._font_fitting(spec.get("font", "Beleren Bold"), size, text, max_width, spec.get("spacing", 0.0))
-        origin = QPointF(float(spec.get("x", 62)), float(spec.get("y", 56)) + QFontMetricsF(font).ascent())
-        paint_line_text(painter, origin, text, font, template.is_clear(), outline_width)
+        left = float(spec.get("x", 62))
+        width = QFontMetricsF(font).horizontalAdvance(text)
+        x = left + max(0.0, (max_width - width) / 2) if centered else left
+        origin = QPointF(x, float(spec.get("y", 56)) + QFontMetricsF(font).ascent())
+        paint_line_text(painter, origin, text, font, template.is_clear(), outline_width, fill)
 
     def _font_fitting(self, logical: str, size: float, text: str, max_width: float, spacing: float):
         while size > 12:
@@ -241,16 +264,20 @@ class CardRenderer:
         laid = layouter.fit(design.rules_text, box, float(spec.get("max_size", 31)), float(spec.get("min_size", 17)))
         top_offset = box.top() + max(0.0, (box.height() - laid.total_height) / 2)
         for line in laid.lines:
-            self._paint_line(painter, line, box.left(), top_offset, laid.font_size, spec.get("font", "MPlantin"), template)
+            left = box.left()
+            if design.center_description:
+                left += max(0.0, (box.width() - laid_line_width(line)) / 2)
+            self._paint_line(painter, line, left, top_offset, laid.font_size, spec.get("font", "MPlantin"),
+                            template, resolved_text_color(design, template, "rules"))
 
     def _paint_line(self, painter: QPainter, line, left: float, top_offset: float, size: float, font_name: str,
-                    template: CardTemplate) -> None:
+                    template: CardTemplate, fill: QColor) -> None:
         baseline = top_offset + line.baseline
         for placed in line.items:
             if isinstance(placed.item, WordItem):
                 font = self.assets.font(font_name, size, placed.item.italic)
                 paint_line_text(painter, QPointF(left + placed.x, baseline), placed.item.text, font,
-                                template.is_clear(), CLEAR_OUTLINE_BODY)
+                                template.is_clear(), CLEAR_OUTLINE_BODY, fill)
             elif isinstance(placed.item, SymbolItem):
                 side = symbol_side(size)
                 target = QRectF(left + placed.x, baseline - side * 0.88, side, side)
@@ -266,25 +293,28 @@ class CardRenderer:
         center_x = float(spec.get("text_center_x", 645))
         baseline = float(spec.get("text_y", 936)) + metrics.ascent()
         origin = QPointF(center_x - metrics.horizontalAdvance(text) / 2, baseline)
-        paint_line_text(painter, origin, text, font, template.is_clear(), CLEAR_OUTLINE_TITLE)
+        paint_line_text(painter, origin, text, font, template.is_clear(), CLEAR_OUTLINE_TITLE,
+                        resolved_text_color(design, template, "pt"))
 
     def _paint_bottom_info(self, painter: QPainter, design: CardDesign, template: CardTemplate) -> None:
-        self._paint_info_line(painter, design.artist, template.layout.get("artist", {}), "Matrix Bold Small Caps", 24, template)
+        self._paint_info_line(painter, design.artist, template.layout.get("artist", {}), "Matrix Bold Small Caps", 24,
+                             template, resolved_text_color(design, template, "artist"))
         if not template.is_clear():
             self._paint_artist_brush(painter, design, template.layout.get("artist", {}))
-        self._paint_info_line(painter, design.legal_text, template.layout.get("legal", {}), "MPlantin", 17, template)
+        self._paint_info_line(painter, design.legal_text, template.layout.get("legal", {}), "MPlantin", 17, template,
+                             resolved_text_color(design, template, "legal"))
 
     def _paint_info_line(self, painter: QPainter, text: str, spec: dict, default_font: str, default_size: float,
-                         template: CardTemplate) -> None:
+                         template: CardTemplate, fill: QColor) -> None:
         if not text:
             return
         font = self.assets.font(spec.get("font", default_font), float(spec.get("size", default_size)))
         origin = QPointF(float(spec.get("x", 48)), float(spec.get("y", 995)) + QFontMetricsF(font).ascent())
         if template.is_clear():
-            paint_outlined_text(painter, origin, text, font, CLEAR_FILL, CLEAR_OUTLINE, CLEAR_OUTLINE_SMALL)
+            paint_outlined_text(painter, origin, text, font, fill, CLEAR_OUTLINE, CLEAR_OUTLINE_SMALL)
             return
         painter.setFont(font)
-        painter.setPen(QColor(spec.get("color", "white")))
+        painter.setPen(fill)
         painter.drawText(origin, text)
 
     def _paint_artist_brush(self, painter: QPainter, design: CardDesign, spec: dict) -> None:
@@ -292,7 +322,9 @@ class CardRenderer:
         if not design.artist or brush is None or "brush" not in spec:
             return
         x, y = spec["brush"]
-        painter.drawImage(QRectF(float(x), float(y), 21, 13), tinted(brush, QColor(spec.get("color", "white"))))
+        template = self.assets.template(design.template_id)
+        painter.drawImage(QRectF(float(x), float(y), 21, 13),
+                          tinted(brush, resolved_text_color(design, template, "artist")))
 
     def _apply_corner_mask(self, painter: QPainter, canvas: QRect) -> None:
         mask = self.assets.card_mask()
@@ -323,12 +355,13 @@ def paint_mana_fade(painter: QPainter, left: float, top: float, width: float, he
 
 
 def paint_line_text(painter: QPainter, origin: QPointF, text: str, font: QFont, outlined: bool,
-                    outline_width: float) -> None:
+                    outline_width: float, fill: QColor | None = None) -> None:
+    color = fill or TEXT_COLOR
     if outlined:
-        paint_outlined_text(painter, origin, text, font, CLEAR_FILL, CLEAR_OUTLINE, outline_width)
+        paint_outlined_text(painter, origin, text, font, color, CLEAR_OUTLINE, outline_width)
         return
     painter.setFont(font)
-    painter.setPen(TEXT_COLOR)
+    painter.setPen(color)
     painter.drawText(origin, text)
 
 
