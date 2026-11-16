@@ -40,10 +40,18 @@ def normalize_key(text: str) -> str:
     return "".join(character for character in text.lower() if character.isalnum())
 
 
+GENERATED_STYLE_MARKERS = ("-western-anime", "-photorealistic-cinematic")
+
+
 def file_key(path: Path) -> str:
     stem = path.stem.lower()
     if stem.endswith("(1)"):
         stem = stem[:-3]
+    for marker in GENERATED_STYLE_MARKERS:
+        index = stem.find(marker)
+        if index > 0:
+            stem = stem[:index]
+            break
     return normalize_key(stem)
 
 
@@ -68,7 +76,8 @@ def match_image_to_card(image: Path, card_names: list[str]) -> str | None:
         for card_key in card_keys(name):
             if key == card_key:
                 return name
-            if len(key) >= 5 and (card_key.endswith(key) or key.endswith(card_key)):
+            if len(card_key) >= 5 and (key.startswith(card_key) or key.endswith(card_key)
+                                       or card_key.endswith(key)):
                 score = min(len(card_key), len(key))
                 if score > best_score:
                     best_name, best_score = name, score
@@ -77,12 +86,17 @@ def match_image_to_card(image: Path, card_names: list[str]) -> str | None:
 
 def match_images(folder: Path, card_names: list[str]) -> dict[str, Path]:
     matches: dict[str, Path] = {}
-    for image in sorted(folder.iterdir()):
+    newest: dict[str, float] = {}
+    for image in sorted(Path(folder).iterdir()):
         if not image.is_file() or not is_image_file(image):
             continue
         name = match_image_to_card(image, card_names)
-        if name is not None:
+        if name is None:
+            continue
+        stamp = image.stat().st_mtime
+        if name not in matches or stamp > newest[name]:
             matches[name] = image
+            newest[name] = stamp
     return matches
 
 

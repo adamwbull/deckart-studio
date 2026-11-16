@@ -17,6 +17,7 @@ TARGET_TEMPLATE = ASSET_ROOT / "templates" / "clearart"
 CANVAS_WIDTH, CANVAS_HEIGHT = 749, 1044
 LAYOUT = {
     "title": {"x": 48, "y": 42, "font": "Beleren Bold", "size": 40, "spacing": 0.15},
+    "subtitle": {"x": 48, "y": 86, "font": "Beleren Bold", "size": 22, "spacing": 0.08},
     "mana": {"right_x": 701, "y": 44, "radius": 17.5, "step": 31},
     "type": {"x": 48, "y": 638, "font": "Beleren Bold", "size": 28, "spacing": 0.05},
     "text": {"x": 48, "y": 688, "width": 653, "height": 248, "font": "MPlantin", "max_size": 30, "min_size": 16},

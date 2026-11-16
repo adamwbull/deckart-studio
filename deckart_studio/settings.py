@@ -4,6 +4,7 @@ from pathlib import Path
 
 from deckart_studio.app_paths import data_directory, default_deck_art_root, default_saved_objects_folder
 from deckart_studio.gemini.art_styles import merge_default_art_styles
+from deckart_studio.prompt_library import default_prompt_folder
 
 AI_FOLDER_SUFFIX = "_ai"
 ORIGINAL_SUBFOLDER = "original"
@@ -53,6 +54,7 @@ class AppSettings:
     last_artist_credit: str = ""
     gemini_api_key: str = ""
     gemini_model_id: str = "nano-banana-2"
+    prompt_folder: str = ""
     art_styles: list[str] = field(default_factory=list)
     last_art_style: str = ""
     check_for_updates: bool = True
@@ -91,6 +93,8 @@ class AppSettings:
         self.art_styles = merge_default_art_styles(self.art_styles)
         if not self.last_art_style or self.last_art_style not in self.art_styles:
             self.last_art_style = self.art_styles[0]
+        if not self.prompt_folder:
+            self.prompt_folder = str(default_prompt_folder())
         self.ensure_deck_art_root()
         self.add_gallery_folder(self.deck_art_root())
 

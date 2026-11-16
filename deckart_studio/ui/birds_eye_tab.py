@@ -33,7 +33,7 @@ class BirdsEyeTab(QWidget):
     def _header(self) -> QHBoxLayout:
         header = QHBoxLayout()
         header.addWidget(self._count_label)
-        header.addWidget(hint_label("Click a card to pick art, drop an image onto it, or right-click for more."))
+        header.addWidget(hint_label("Click a card to pick art. Right-click it to delete, move, copy, or set as commander."))
         header.addStretch(1)
         header.addLayout(self._size_controls())
         return header

@@ -1,4 +1,6 @@
+import copy
 import json
+import secrets
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -136,6 +138,16 @@ class DeckDocument:
     def move_card(self, card: CardFace, target: Board) -> None:
         self.remove_card(card)
         self._attach_card_state(target, card.state)
+
+    def duplicate_card(self, card: CardFace, board: Board) -> None:
+        """Add another physical copy of this card to the stack, with its own image sheet."""
+        clone = copy.deepcopy(card.state)
+        sheet_id = self._next_free_sheet_id()
+        clone["GUID"] = secrets.token_hex(3)
+        clone["CustomDeck"] = {str(sheet_id): single_image_sheet(card.face_url, card.sheet)}
+        clone["CardID"] = sheet_id * CARDS_PER_SHEET_ID
+        self._attach_card_state(board, clone)
+        self.dirty = True
 
     def _attach_card_state(self, board: Board, card_object: dict) -> None:
         if board.container is None:

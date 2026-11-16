@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QListWidget, QPushButton, QVBoxLayout, QWidget,
+    QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout, QWidget,
 )
 
 from deckart_studio.gallery.gallery_library import GallerySection
@@ -35,18 +35,28 @@ class GalleryDock(QWidget):
         drop.pathsDropped.connect(self._on_paths_dropped)
         self._section.addItems(list(SECTION_CHOICES))
         self._sources_list.setMaximumHeight(110)
+        folders = QLabel("Folders the gallery searches")
+        show = QLabel("Show")
+        section_row = QHBoxLayout()
+        section_row.addWidget(show)
+        section_row.addWidget(self._section, 1)
         layout = QVBoxLayout(self)
         layout.addWidget(drop)
         layout.addLayout(self._source_buttons())
+        layout.addWidget(folders)
         layout.addWidget(self._sources_list)
-        layout.addWidget(self._section)
+        layout.addLayout(section_row)
         layout.addWidget(self._grid, 1)
 
     def _source_buttons(self) -> QHBoxLayout:
         add_folder = QPushButton("Add folder…")
         add_files = QPushButton("Add photos…")
-        remove = QPushButton("Remove selected source")
+        remove = QPushButton("Remove folder")
         rescan = QPushButton("Rescan")
+        add_folder.setToolTip("Register a folder of images")
+        add_files.setToolTip("Register individual image files")
+        remove.setToolTip("Stop searching the folder selected in the list")
+        rescan.setToolTip("Look again for new images in the registered folders")
         add_folder.clicked.connect(self._choose_folder)
         add_files.clicked.connect(self._choose_files)
         remove.clicked.connect(self._remove_selected_source)
@@ -86,5 +96,7 @@ class GalleryDock(QWidget):
 
     def _remove_selected_source(self) -> None:
         item = self._sources_list.currentItem()
-        if item is not None:
-            self.context.remove_gallery_source(item.text())
+        if item is None:
+            self.context.session.statusMessage.emit("Select a folder in the list first")
+            return
+        self.context.remove_gallery_source(item.text())

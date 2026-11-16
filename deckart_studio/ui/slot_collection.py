@@ -3,6 +3,7 @@ from PySide6.QtCore import QObject
 from deckart_studio.image_source import ImageSource
 from deckart_studio.tts.card_face import CardFace
 from deckart_studio.ui.app_context import AppContext
+from deckart_studio.ui.card_commands import confirm_delete_card
 from deckart_studio.ui.card_maker_dialog import design_card_face
 from deckart_studio.ui.card_slot import CardSlotWidget
 from deckart_studio.ui.face_chooser import choose_face_for_card
@@ -23,9 +24,9 @@ class SlotCollection(QObject):
         slot = CardSlotWidget(self.context, card, self.slot_width, self.parent_widget)
         slot.clicked.connect(self._on_slot_clicked)
         slot.designRequested.connect(self._on_design_requested)
-        slot.removeRequested.connect(self.context.session.remove_card)
+        slot.removeRequested.connect(self._on_remove_requested)
         slot.commanderRequested.connect(self.context.session.make_commander)
-        slot.moveRequested.connect(self.context.session.move_card)
+        slot.duplicateRequested.connect(self.context.session.duplicate_card)
         slot.imageDropped.connect(self._on_slot_dropped)
         self._slots[card.index] = slot
         return slot
@@ -51,6 +52,9 @@ class SlotCollection(QObject):
         card = self.context.session.card(index)
         if slot is not None and card is not None:
             slot.refresh(card)
+
+    def _on_remove_requested(self, index: int) -> None:
+        confirm_delete_card(self.parent_widget, self.context.session, index)
 
     def _on_slot_clicked(self, index: int) -> None:
         card = self.context.session.card(index)

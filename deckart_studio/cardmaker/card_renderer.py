@@ -30,8 +30,8 @@ CLEAR_OUTLINE_BODY = 1.8
 CLEAR_OUTLINE_SMALL = 1.2
 MANA_CLUSTER_STEP = 31.0
 SPLIT_TITLE_ROW_STEP = 34.0
-CUSTOM_NAME_SUBTITLE_SIZE_RATIO = 0.58
-CUSTOM_NAME_SUBTITLE_GAP = 5.0
+CUSTOM_NAME_SUBTITLE_SIZE_RATIO = 0.52
+CUSTOM_NAME_SUBTITLE_GAP = 4.0
 
 
 class CardRenderer:
@@ -225,15 +225,20 @@ class CardRenderer:
 
     def _subtitle_layout(self, template: CardTemplate, title_spec: dict, base_y: float, main_font,
                          title_limit: float, main_size: float) -> tuple[dict, float]:
-        subtitle_spec = dict(template.layout.get("subtitle", title_spec))
-        subtitle_spec["size"] = max(17.0, float(subtitle_spec.get("size", main_size * CUSTOM_NAME_SUBTITLE_SIZE_RATIO)))
+        raw = template.layout.get("subtitle")
+        subtitle_spec = dict(raw) if raw else {key: value for key, value in title_spec.items() if key != "size"}
+        if raw and raw.get("size"):
+            subtitle_spec["size"] = float(raw["size"])
+        else:
+            subtitle_spec["size"] = max(16.0, main_size * CUSTOM_NAME_SUBTITLE_SIZE_RATIO)
         if template.is_fullart():
             subtitle_spec["x"] = float(subtitle_spec.get("x", PLATE_TEXT_INSET + 38))
             subtitle_spec["y"] = float(subtitle_spec.get("y", SUBTITLE_TEXT_Y))
             return subtitle_spec, PLATE_RIGHT - float(subtitle_spec["x"]) - PLATE_TEXT_INSET
         metrics = QFontMetricsF(main_font)
-        subtitle_spec["y"] = base_y + metrics.ascent() + metrics.descent() + CUSTOM_NAME_SUBTITLE_GAP
         subtitle_spec.setdefault("x", title_spec.get("x", 62))
+        subtitle_spec["y"] = float(subtitle_spec.get(
+            "y", base_y + metrics.ascent() + metrics.descent() + CUSTOM_NAME_SUBTITLE_GAP))
         return subtitle_spec, title_limit
 
     def _paint_single_line(self, painter: QPainter, text: str, spec: dict, max_width: float,

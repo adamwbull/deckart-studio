@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from PySide6.QtGui import QAction, QColor, QImage
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from deckart_studio.app_paths import resource_root
 from deckart_studio.cardmaker.asset_library import CardAssetLibrary
@@ -74,7 +74,7 @@ class SelfTest:
                   self.check_steam_detection,
                   self.check_main_window_boots, self.check_session_stacks, self.check_split_card_design,
                   self.check_custom_display_name, self.check_imported_italics, self.check_fullart_plates,
-                  self.check_fullart_chrome, self.check_gemini_prompt,
+                  self.check_fullart_chrome, self.check_gemini_prompt, self.check_prompt_library,
                   self.check_update_versioning, self.check_token_lookup, self.check_batch_artist_override,
                   self.check_dialogs_construct, self.check_gallery_ai_tab]
         if self.online:
@@ -271,8 +271,13 @@ class SelfTest:
         assert title.startswith(f"{APP_NAME} {APP_VERSION}"), title
         assert self.context.session.document.path.name in title, title
         settings_labels = [action.text() for action in self.window.findChildren(QAction)]
+        button_labels = [button.text() for button in self.window.findChildren(QPushButton)]
         assert "Settings" in settings_labels
         assert "Settings (folders)…" not in settings_labels
+        assert "Delete card" in button_labels
+        assert "Move to stack" in button_labels
+        assert "Restyle deck…" in button_labels
+        assert not any(label.startswith("1. ") for label in button_labels), button_labels
         return f"opened {self.context.session.document.path.name}"
 
     def check_session_stacks(self) -> str:
@@ -295,7 +300,16 @@ class SelfTest:
         session.set_active_board(0)
         self._pump_events(0.3)
         assert not session.common_back_source().is_empty(), "no common card back resolved"
-        return "switch/add/move/remove through the session verified"
+        original = session.cards()[0].nickname
+        count = len(session.cards())
+        session.duplicate_card(0)
+        assert len(session.cards()) == count + 1, "duplicate did not add a card"
+        assert session.cards()[-1].nickname == original
+        assert session.cards()[-1].card_id != session.cards()[0].card_id, "copy reused the original sheet"
+        session.move_card_to_new_board(0, "Holding")
+        assert session.active_board().name == "Holding", session.active_board().name
+        assert [card.nickname for card in session.cards()] == [original]
+        return "switch/add/move/remove/duplicate through the session verified"
 
     def check_split_card_design(self) -> str:
         from deckart_studio.cardmaker.card_design import design_from_scryfall, is_split_design
@@ -425,6 +439,32 @@ class SelfTest:
         red = title_plate_sample(renderer.render(custom, EXPORT_SCALE))
         assert red[0] > 180 and red[0] > red[1] and red[0] > red[2], red
         return f"{len(rendered)} plate styles, frame tint, text color, and custom title piece"
+
+    def check_prompt_library(self) -> str:
+        from PySide6.QtCore import QMimeData
+
+        from deckart_studio.prompt_library import prompt_text_for, save_card_prompt
+        from deckart_studio.ui.ai_art_panel import PromptEdit, mime_plain_text
+
+        scratch = self.workspace / "scratch-prompts.txt"
+        scratch.write_text(
+            "COMMANDERS\n----------\n\nTest Chrome\n(Selftest Wizard)\noriginal alley rain\n\n",
+            encoding="utf-8",
+        )
+        save_card_prompt(self.workspace, ["Selftest Wizard", "Test Chrome"],
+                         "rewritten neon alley", "Test Chrome", "Selftest Wizard")
+        assert prompt_text_for(self.workspace, "Selftest Wizard") == "rewritten neon alley"
+        save_card_prompt(self.workspace, ["Brand New Card"], "first prompt for new chrome",
+                         "Brand New Card", "Brand New Card")
+        assert "first prompt for new chrome" in prompt_text_for(self.workspace, "Brand New Card")
+        mime = QMimeData()
+        mime.setHtml("<p>pasted cyberpunk alley</p>")
+        mime.setText("pasted cyberpunk alley")
+        assert mime_plain_text(mime) == "pasted cyberpunk alley"
+        edit = PromptEdit()
+        edit.insertFromMimeData(mime)
+        assert edit.toPlainText() == "pasted cyberpunk alley", edit.toPlainText()
+        return "autofill, paste, and autosave ok"
 
     def check_gemini_prompt(self) -> str:
         from deckart_studio.gemini.art_styles import DEFAULT_ART_STYLES, STYLE_INSTRUCTIONS, merge_default_art_styles

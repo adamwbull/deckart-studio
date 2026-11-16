@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from deckart_studio.cardmaker.card_design import DEFAULT_TEMPLATE_ID, CardDesign, design_from_scryfall, format_imported_rules
+from deckart_studio.cardmaker.card_design import (
+    DEFAULT_TEMPLATE_ID, CardDesign, apply_registered_custom_name, design_from_scryfall, format_imported_rules,
+)
 from deckart_studio.cardmaker.card_lookup import CardLookup
 from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, CardRenderer
 from deckart_studio.cardmaker.design_store import DesignStore
@@ -26,6 +28,7 @@ class BatchCard:
     face_local_path: Path | None
     scope_name: str
     source_art_path: Path | None = None
+    oracle_name: str = ""
 
 
 @dataclass
@@ -63,7 +66,8 @@ class DeckFaceBatch:
     def snapshot(cards: list[CardFace], face_source: Callable[[CardFace], ImageSource], board_index: int,
                  scope_name: str) -> list[BatchCard]:
         return [BatchCard(board_index, card.index, card.nickname, card.description,
-                          face_source(card).local_path, scope_name) for card in cards]
+                          face_source(card).local_path, scope_name, oracle_name=card.oracle_name)
+                for card in cards]
 
     def run(self, cards: list[BatchCard], options: BatchOptions, report: ProgressCallback) -> list[RenderedFace]:
         report(f"Looking up {len(cards)} cards on Scryfall…")
@@ -80,13 +84,13 @@ class DeckFaceBatch:
         regular_cards = [card for card in cards if not is_token_description(card.description)]
         found: dict[str, dict] = {}
         if regular_cards:
-            scryfall_cards = self.lookup.lookup_many([card.nickname for card in regular_cards])
+            scryfall_cards = self.lookup.lookup_many([lookup_name(card) for card in regular_cards])
             for card in regular_cards:
-                match = scryfall_cards.get(normalize_card_name(card.nickname))
+                match = scryfall_cards.get(normalize_card_name(lookup_name(card)))
                 if match is not None:
                     found[card.nickname] = match
         for card in token_cards:
-            match = lookup_token_card(self.lookup.scryfall, card.nickname, card.description)
+            match = lookup_token_card(self.lookup.scryfall, lookup_name(card), card.description)
             if match is not None:
                 found[card.nickname] = match
         return found
@@ -111,6 +115,9 @@ class DeckFaceBatch:
         else:
             design = stored or self._fresh_design(card, scryfall_card, fallback)
         apply_batch_options(design, options)
+        apply_registered_custom_name(design, card.nickname, lookup_name(card))
+        if design.template_id == "clearart":
+            design.center_subtitle = False
         design.art_path = self._art_for(card, design, scryfall_card)
         return design
 
@@ -119,7 +126,7 @@ class DeckFaceBatch:
         if scryfall_card is not None:
             return design_from_scryfall(scryfall_card, template_id)
         lines = card.description.splitlines()
-        return CardDesign(template_id=template_id, name=card.nickname, type_line=lines[0] if lines else "",
+        return CardDesign(template_id=template_id, name=lookup_name(card), type_line=lines[0] if lines else "",
                           rules_text=format_imported_rules("\n".join(lines[1:])))
 
     def _art_for(self, card: BatchCard, design: CardDesign, scryfall_card: dict | None) -> str:
@@ -131,6 +138,10 @@ class DeckFaceBatch:
             return design.art_path
         crop = self.lookup.art_crop_path(scryfall_card) if scryfall_card else None
         return str(crop) if crop else ""
+
+
+def lookup_name(card: BatchCard) -> str:
+    return card.oracle_name.strip() or card.nickname
 
 
 def apply_batch_options(design: CardDesign, options: BatchOptions) -> None:

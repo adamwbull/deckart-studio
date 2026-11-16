@@ -21,6 +21,11 @@ class CardFace:
         return self.state.get("Nickname") or f"Card {self.index + 1}"
 
     @property
+    def oracle_name(self) -> str:
+        notes = (self.state.get("GMNotes") or "").strip()
+        return notes or self.nickname
+
+    @property
     def description(self) -> str:
         return self.state.get("Description") or ""
 

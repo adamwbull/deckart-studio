@@ -8,8 +8,8 @@ from PySide6.QtWidgets import (
 )
 
 from deckart_studio.cardmaker.card_design import (
-    CHROME_PIECES, CHROME_STYLE, PIECE_FIELDS, CardDesign, copy_maker_chrome, design_from_scryfall,
-    ensure_real_name, format_imported_rules,
+    CHROME_PIECES, CHROME_STYLE, PIECE_FIELDS, CardDesign, apply_registered_custom_name,
+    copy_maker_chrome, design_from_scryfall, ensure_real_name, format_imported_rules,
 )
 from deckart_studio.cardmaker.card_lookup import CardLookup
 from deckart_studio.cardmaker.card_renderer import EXPORT_SCALE, PREVIEW_SCALE
@@ -44,7 +44,8 @@ class CardMakerDialog(QDialog):
         self.context = context
         self.card = card
         self.design, self._loaded_from_store = initial_design(context, card)
-        ensure_real_name(self.design, card.nickname)
+        ensure_real_name(self.design, card.oracle_name)
+        self._restore_custom_name_after_scryfall = False
         self.result_source: ImageSource | None = None
         self._symbol_target: QWidget | None = None
         self._preview = QLabel()
@@ -64,16 +65,16 @@ class CardMakerDialog(QDialog):
         self._color = QComboBox()
         self._name = QLineEdit(self.design.name)
         self._name_label = QLabel("Card name")
-        self._use_custom_name = QCheckBox("Custom display name")
+        self._use_custom_name = QCheckBox("Custom subtitle")
         self._center_title = QCheckBox("Center main name")
-        self._center_subtitle = QCheckBox("Center custom name")
+        self._center_subtitle = QCheckBox("Center subtitle")
         self._center_description = QCheckBox("Center description box")
         self._custom_name = QLineEdit(self.design.custom_name)
         self._custom_name.setEnabled(False)
-        self._custom_name.setPlaceholderText("Optional — overrides display name when filled")
+        self._custom_name.setPlaceholderText("Optional subtitle under the card name")
         self._real_name = QLineEdit(self.design.real_name)
         self._real_name.setEnabled(False)
-        self._real_name.setPlaceholderText("Shown smaller under the display name")
+        self._real_name.setPlaceholderText("Real Oracle name")
         self._mana = QLineEdit(self.design.mana_cost)
         self._type = QLineEdit(self.design.type_line)
         self._rules = QPlainTextEdit(self.design.rules_text)
@@ -122,7 +123,7 @@ class CardMakerDialog(QDialog):
         self._offset_y.setValue(int(self.design.art_offset_y))
         self._rules.setPlaceholderText("Rules text. Use {U}, {T}, {2} for symbols and *asterisks* for flavor/italics.")
         self._mana.setPlaceholderText("{2}{U}{U}")
-        self._search.set_text(self.card.nickname)
+        self._search.set_text(self.card.oracle_name)
         self._populate_plate_texture_choices()
         self._populate_plate_style_choices()
         self._populate_chrome_mode()
@@ -283,7 +284,8 @@ class CardMakerDialog(QDialog):
         pick_button = QPushButton("Pick from gallery…")
         pick_button.clicked.connect(self._pick_art_from_gallery)
         original_button = QPushButton("Use original card art")
-        original_button.clicked.connect(lambda: self._fetch_original_art(self._name.text() or self.card.nickname))
+        original_button.clicked.connect(
+            lambda: self._fetch_original_art(self._real_name.text() or self.card.oracle_name))
         drop = DropZone("…or drop an image file here")
         drop.sourcesDropped.connect(lambda sources: self._set_art(sources[0]))
         layout = QVBoxLayout(host)
@@ -370,9 +372,9 @@ class CardMakerDialog(QDialog):
         self._custom_name.setEnabled(enabled)
         self._real_name.setEnabled(enabled)
         if enabled and not self._real_name.text().strip():
-            nickname = self.card.nickname.strip()
+            oracle = self.card.oracle_name.strip()
             display = self._name.text().strip()
-            self._real_name.setText(nickname if nickname and nickname != display else display)
+            self._real_name.setText(oracle if oracle and oracle != display else display)
         self._refresh_name_field_labels()
         self.schedule_preview()
 
@@ -381,10 +383,7 @@ class CardMakerDialog(QDialog):
             self._real_name.setText(self._name.text())
 
     def _refresh_name_field_labels(self) -> None:
-        if self._use_custom_name.isChecked():
-            self._name_label.setText("Display name")
-        else:
-            self._name_label.setText("Card name")
+        self._name_label.setText("Card name")
 
     def _on_plate_opacity_changed(self) -> None:
         self._update_opacity_labels()
@@ -414,8 +413,12 @@ class CardMakerDialog(QDialog):
         self.design.color_id = self._color.currentData() or self.design.color_id
         self._refresh_color_choices()
         self._refresh_plate_panel_visibility()
-        if self.context.card_assets.template(self._template.currentData()).is_fullart():
+        template = self.context.card_assets.template(self._template.currentData())
+        if template.is_fullart():
             self._center_subtitle.setChecked(True)
+        elif template.is_clear():
+            self._center_title.setChecked(False)
+            self._center_subtitle.setChecked(False)
         self._sync_text_color_defaults()
         self.schedule_preview()
 
@@ -474,8 +477,9 @@ class CardMakerDialog(QDialog):
         self._art_label.setText(Path(self.design.art_path).name if self.design.art_path else "No artwork chosen")
 
     def _prefill_from_scryfall_if_blank(self) -> None:
-        if not self._loaded_from_store and self.card.nickname:
-            self._prefill_from_scryfall(self.card.nickname)
+        if not self._loaded_from_store and self.card.oracle_name:
+            self._restore_custom_name_after_scryfall = True
+            self._prefill_from_scryfall(self.card.oracle_name)
 
     def _prefill_from_scryfall(self, card_name: str) -> None:
         self._status.setText(f"Looking up “{card_name}” on Scryfall…")
@@ -487,8 +491,11 @@ class CardMakerDialog(QDialog):
         fetched.art_path, fetched.legal_text = self.design.art_path, self.design.legal_text
         copy_maker_chrome(self.design, fetched)
         self.design = fetched
+        if self._restore_custom_name_after_scryfall:
+            apply_registered_custom_name(self.design, self.card.nickname, self.card.oracle_name)
+            self._restore_custom_name_after_scryfall = False
         self._load_design_into_widgets()
-        self._status.setText(f"Filled from Scryfall: {fetched.name}")
+        self._status.setText(f"Filled from Scryfall: {fetched.real_name or fetched.name}")
         if not self.design.art_path:
             self._download_art_crop(card)
 
@@ -614,9 +621,11 @@ def initial_design(context: AppContext, card: CardFace) -> tuple[CardDesign, boo
     face = context.session.face_source(card)
     stored = context.design_store.load_design_for_face(face.local_path)
     if stored is not None:
-        ensure_real_name(stored, card.nickname)
+        apply_registered_custom_name(stored, card.nickname, card.oracle_name)
+        ensure_real_name(stored, card.oracle_name)
         return stored, True
-    design = CardDesign(name=card.nickname, real_name=card.nickname)
+    design = CardDesign(name=card.nickname, real_name=card.oracle_name)
+    apply_registered_custom_name(design, card.nickname, card.oracle_name)
     design.type_line, design.rules_text = split_description(card.description)
     if face.local_path is not None and context.gallery.contains(face.local_path):
         design.art_path = str(face.local_path)

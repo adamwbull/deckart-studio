@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 
-from deckart_studio.gemini.sync import add_elephant_token, sync_gemini_deck
+from deckart_studio.gemini.sync import add_elephant_token, list_missing_gemini_art, sync_gemini_deck
 from deckart_studio.settings import AppSettings
 
 DEFAULT_DECK = Path.home() / "OneDrive/Documents/My Games/Tabletop Simulator/Saves/Saved Objects/The-Moment-1.4.json"

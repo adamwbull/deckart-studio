@@ -45,7 +45,8 @@ def sync_gemini_deck(deck_path: Path, gemini_folder: Path, template_id: str = DE
     document = DeckDocument.load(deck_path)
     boards = document.boards()
     deck_name = document.name
-    card_names = sorted({card.nickname for board in boards for card in board.cards})
+    card_names = sorted({name for board in boards for card in board.cards
+                         for name in (card.nickname, card.oracle_name)})
     matches = match_images(gemini_folder, card_names)
     if not matches:
         report("No gemini images matched any card in the deck.")
@@ -55,11 +56,11 @@ def sync_gemini_deck(deck_path: Path, gemini_folder: Path, template_id: str = DE
     for board_index, board in enumerate(boards):
         scope = render_scope_name(deck_name, board_index, board.name)
         for card in board.cards:
-            art = matches.get(card.nickname)
+            art = matches.get(card.nickname) or matches.get(card.oracle_name)
             if art is None:
                 continue
             batch_cards.append(BatchCard(board_index, card.index, card.nickname, card.description,
-                                         None, scope, source_art_path=art))
+                                         None, scope, source_art_path=art, oracle_name=card.oracle_name))
 
     assets = CardAssetLibrary().load()
     store = DesignStore(settings.deck_art_root())
@@ -72,13 +73,22 @@ def sync_gemini_deck(deck_path: Path, gemini_folder: Path, template_id: str = DE
         document.set_face(board.cards[face.index], local_path_to_url(face.path))
 
     document.save()
-    return {"matched": len(matches), "rendered": len(rendered), "missing": missing_card_names(gemini_folder, card_names)}
+    unmatched = sorted({
+        card.nickname for board in boards for card in board.cards
+        if card.nickname not in matches and card.oracle_name not in matches
+    })
+    return {"matched": len(matches), "rendered": len(rendered), "missing": unmatched}
 
 
 def list_missing_gemini_art(deck_path: Path, gemini_folder: Path) -> list[str]:
     document = DeckDocument.load(deck_path)
-    card_names = sorted({card.nickname for board in document.boards() for card in board.cards})
-    return missing_card_names(gemini_folder, card_names)
+    cards = [card for board in document.boards() for card in board.cards]
+    names = [name for card in cards for name in (card.nickname, card.oracle_name)]
+    matches = match_images(gemini_folder, names)
+    return sorted({
+        card.nickname for card in cards
+        if card.nickname not in matches and card.oracle_name not in matches
+    })
 
 
 def add_elephant_token(deck_path: Path, template_id: str = DEFAULT_TEMPLATE_ID,

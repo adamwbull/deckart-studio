@@ -42,7 +42,7 @@ class CardDesign:
     head_opacity: float = 0.92
     body_opacity: float = 0.92
     center_title: bool = False
-    center_subtitle: bool = True
+    center_subtitle: bool = False
     center_description: bool = False
     title_color: str = ""
     subtitle_color: str = ""
@@ -155,6 +155,17 @@ def uses_custom_display_name(design: CardDesign) -> bool:
 def ensure_real_name(design: CardDesign, fallback: str) -> None:
     if not design.real_name.strip() and fallback.strip():
         design.real_name = fallback.strip()
+
+
+def apply_registered_custom_name(design: CardDesign, display_name: str, oracle_name: str) -> None:
+    display = display_name.strip()
+    oracle = oracle_name.strip()
+    if not display or not oracle or display == oracle:
+        return
+    design.use_custom_name = True
+    design.custom_name = display
+    design.real_name = oracle
+    design.name = display
 
 
 CHROME_FIELDS = (

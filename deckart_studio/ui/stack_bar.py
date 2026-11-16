@@ -1,7 +1,6 @@
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel, QMessageBox, QPushButton, QWidget
 
 from deckart_studio.tts.board import Board
-from deckart_studio.ui.action_bar import hint_label
 from deckart_studio.ui.add_card_dialog import add_card_to_active_stack
 from deckart_studio.ui.app_context import AppContext
 
@@ -19,7 +18,7 @@ class StackBar(QFrame):
         self._add_card = QPushButton("+ Add card…")
         self._new_stack = QPushButton("+ New stack…")
         self._rename = QPushButton("Rename…")
-        self._delete = QPushButton("Delete stack")
+        self._delete = QPushButton("Delete stack…")
         self._build()
         self._connect()
         self.refresh()
@@ -44,7 +43,6 @@ class StackBar(QFrame):
         layout.addWidget(self._rename)
         layout.addWidget(self._delete)
         layout.addStretch(1)
-        layout.addWidget(hint_label("Right-click a card to set it as commander, move it to another stack, or remove it."))
 
     def _connect(self) -> None:
         self._stacks.activated.connect(self.context.session.set_active_board)
@@ -67,7 +65,7 @@ class StackBar(QFrame):
     def _refresh_buttons(self) -> None:
         board = self.context.session.active_board()
         has_deck = self.context.session.has_deck()
-        self._count.setText(f"{board.card_count()} cards" if board else "")
+        self._count.setText(f"{board.card_count()} in this stack" if board else "")
         self._stacks.setEnabled(board is not None)
         self._add_card.setEnabled(board is not None)
         self._new_stack.setEnabled(has_deck)

@@ -1,2 +1,3 @@
-PRIMARY_BUTTON_STYLE = "font-weight: bold; font-size: 14px; padding: 10px 26px;"
-ACTION_BAR_BUTTON_STYLE = "font-weight: bold; font-size: 14px; padding: 10px 18px;"
+PRIMARY_BUTTON_STYLE = "font-weight: bold; padding: 8px 14px;"
+ACTION_BAR_BUTTON_STYLE = "font-weight: 600; padding: 6px 14px;"
+DESTRUCTIVE_BUTTON_STYLE = "color: #ff8a80; padding: 6px 12px;"

@@ -32,7 +32,7 @@ class DeckRestyleDialog(QDialog):
         self._build()
 
     def _window_title(self) -> str:
-        return "Set artist on all cards" if self._artist_only else "Make deck single art"
+        return "Set artist on all cards" if self._artist_only else "Restyle deck"
 
     def _start_label(self) -> str:
         return "Apply artist and re-render" if self._artist_only else "Render deck and save"

@@ -6,7 +6,7 @@ from deckart_studio.ui.styles import ACTION_BAR_BUTTON_STYLE
 
 
 class ActionBar(QFrame):
-    """The workflow strip under the toolbar: import a deck, edit a card, restyle the whole deck, save."""
+    """Deck-wide actions that are not tied to the card currently on screen."""
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -16,9 +16,9 @@ class ActionBar(QFrame):
         self._deck_dependent: list[QPushButton] = []
         self._publish_hint = warning_label()
 
-    def add_step(self, step_number: int, text: str, handler: Callable[[], None], tooltip: str = "",
-                 needs_deck: bool = True) -> QPushButton:
-        button = QPushButton(f"{step_number}. {text}")
+    def add_action(self, text: str, handler: Callable[[], None], tooltip: str = "",
+                   needs_deck: bool = True) -> QPushButton:
+        button = QPushButton(text)
         button.setStyleSheet(ACTION_BAR_BUTTON_STYLE)
         button.setToolTip(tooltip)
         button.clicked.connect(handler)

@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from deckart_studio.tts.card_face import CardFace
+from deckart_studio.ui.action_bar import hint_label
 from deckart_studio.ui.app_context import AppContext
 from deckart_studio.ui.flow_layout import FlowLayout
 from deckart_studio.ui.slot_collection import SlotCollection
@@ -32,6 +33,7 @@ class GroupsTab(QWidget):
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Group by"))
         controls.addWidget(self._mode)
+        controls.addWidget(hint_label("Right-click a card to delete it, move it, copy it, or set it as commander."))
         controls.addStretch(1)
         self._sections_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         scroll = QScrollArea(self)

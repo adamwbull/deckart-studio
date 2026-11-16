@@ -87,6 +87,13 @@
       "size": 40,
       "spacing": 0.15
     },
+    "subtitle": {
+      "x": 48,
+      "y": 86,
+      "font": "Beleren Bold",
+      "size": 22,
+      "spacing": 0.08
+    },
     "mana": {
       "right_x": 701,
       "y": 44,

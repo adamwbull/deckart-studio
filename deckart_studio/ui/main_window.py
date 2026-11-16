@@ -5,8 +5,8 @@ from PySide6.QtCore import QByteArray, QTimer, Qt
 from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox, QTabWidget,
-    QToolBar, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QDockWidget, QFileDialog, QLabel, QMainWindow, QMessageBox, QSizePolicy,
+    QTabWidget, QToolBar, QVBoxLayout, QWidget,
 )
 
 from deckart_studio.tts.saved_objects import discover_deck_files
@@ -51,11 +51,14 @@ class MainWindow(QMainWindow):
         self._dirty_label = QLabel()
         self._available_update = ""
         self._installing_update = False
+        self._deck_actions: list[QAction] = []
         self._action_bar = ActionBar()
         self._focus_tab = FocusTab(context)
         self._tabs = QTabWidget(self)
+        self._view_menu = None
         self._refresh_window_title()
         self.resize(1500, 950)
+        self._build_menus()
         self._build_toolbar()
         self._build_action_bar()
         self._build_tabs()
@@ -68,48 +71,67 @@ class MainWindow(QMainWindow):
         if self.context.settings.check_for_updates and should_check_for_updates():
             QTimer.singleShot(2500, lambda: self._check_for_updates(silent=True))
 
+    def _build_menus(self) -> None:
+        file_menu = self.menuBar().addMenu("File")
+        deck_menu = self.menuBar().addMenu("Deck")
+        self._view_menu = self.menuBar().addMenu("View")
+        help_menu = self.menuBar().addMenu("Help")
+        self._import_action = self._menu_action(file_menu, "Import Moxfield / deck list…", self._import_deck, "Ctrl+I")
+        self._menu_action(file_menu, "Refresh deck list", self.refresh_deck_list)
+        file_menu.addSeparator()
+        self._save_action = self._menu_action(file_menu, "Save", self._save, "Ctrl+S", needs_deck=True)
+        self._menu_action(file_menu, "Save As…", self._save_as, "Ctrl+Shift+S", needs_deck=True)
+        file_menu.addSeparator()
+        self._menu_action(file_menu, "Open Saved Objects folder", self._open_saved_objects_folder)
+        self._menu_action(deck_menu, "Restyle deck…", self._restyle_deck, needs_deck=True,
+                          tooltip="Rebuild every card in one frame: Full Art, Clear Art, M15, or 8th Edition")
+        self._menu_action(deck_menu, "Set artist on all cards…", self._set_deck_artist, needs_deck=True)
+        self._menu_action(deck_menu, "Publish to Steam Cloud…", self._publish_deck, needs_deck=True,
+                          tooltip="Upload images that only exist on this PC so everyone in the TTS game can see them")
+        self._menu_action(help_menu, "Settings", self._open_settings)
+        self._menu_action(help_menu, "Check for updates", self._check_for_updates)
+
+    def _menu_action(self, menu, text: str, handler, shortcut: str = "", needs_deck: bool = False,
+                     tooltip: str = "") -> QAction:
+        action = QAction(text, self)
+        action.triggered.connect(handler)
+        if shortcut:
+            action.setShortcut(QKeySequence(shortcut))
+        if tooltip:
+            action.setToolTip(tooltip)
+        if needs_deck:
+            action.setEnabled(False)
+            self._deck_actions.append(action)
+        menu.addAction(action)
+        return action
+
     def _build_toolbar(self) -> None:
         toolbar = QToolBar("Deck", self)
         self._toolbar = toolbar
         toolbar.setMovable(False)
         toolbar.addWidget(QLabel(" Deck: "))
         self._deck_combo.setMinimumWidth(320)
+        self._deck_combo.setToolTip("Decks in your Tabletop Simulator Saved Objects folder")
         self._deck_combo.activated.connect(self._on_deck_chosen)
         toolbar.addWidget(self._deck_combo)
-        self._add_action(toolbar, "Refresh list", self.refresh_deck_list)
-        self._add_action(toolbar, "Import Moxfield / deck list…", self._import_deck, "Ctrl+I")
-        toolbar.addSeparator()
-        self._add_action(toolbar, "Save", self._save, "Ctrl+S")
-        self._add_action(toolbar, "Save As…", self._save_as, "Ctrl+Shift+S")
-        toolbar.addSeparator()
-        self._artist_action = self._add_action(toolbar, "Set artist on all cards…", self._set_deck_artist)
-        self._artist_action.setEnabled(False)
-        self._add_action(toolbar, "Settings", self._open_settings)
-        self._add_action(toolbar, "Check for updates now", self._check_for_updates)
-        self._add_action(toolbar, "Open Saved Objects folder", self._open_saved_objects_folder)
-        toolbar.addSeparator()
+        toolbar.addAction(self._import_action)
+        toolbar.addAction(self._save_action)
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
+        self._dirty_label.setStyleSheet("color: #ffb74d; font-weight: bold;")
         toolbar.addWidget(self._dirty_label)
         self.addToolBar(toolbar)
 
-    def _add_action(self, toolbar: QToolBar, text: str, handler, shortcut: str = "") -> QAction:
-        action = QAction(text, self)
-        action.triggered.connect(handler)
-        if shortcut:
-            action.setShortcut(QKeySequence(shortcut))
-        toolbar.addAction(action)
-        return action
-
     def _build_action_bar(self) -> None:
-        self._action_bar.add_step(1, "Import deck from Moxfield…", self._import_deck,
-                                  "Paste a Moxfield link or deck list; the deck lands in Saved Objects ready for TTS",
-                                  needs_deck=False)
-        self._action_bar.add_step(2, "Edit current card (Card Maker)…", self._design_current_card,
-                                  "Swap the art and re-render the selected card as a custom face")
-        self._action_bar.add_step(3, "Make deck single art…", self._restyle_deck,
-                                  "Pick a frame. Full Art also lets you choose a plate style or custom PNG bars.")
-        self._action_bar.add_step(4, "Save deck", self._save, "Write the deck JSON back into Saved Objects")
-        self._action_bar.add_step(5, "Publish to Steam Cloud…", self._publish_deck,
-                                  "Upload local images to Steam Cloud so everyone in your TTS game sees them, then save")
+        self._action_bar.add_action(
+            "Restyle deck…", self._restyle_deck,
+            "Rebuild every card in one frame: Full Art, Clear Art, M15, or 8th Edition",
+        )
+        self._action_bar.add_action(
+            "Publish to Steam Cloud…", self._publish_deck,
+            "Upload images that only exist on this PC so everyone in the TTS game can see them",
+        )
         self._action_bar.add_trailing(CardBackWidget(self.context))
         self._action_bar.set_deck_open(False)
 
@@ -125,10 +147,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._tabs, 1)
         self.setCentralWidget(central)
 
-    def _design_current_card(self) -> None:
-        self._tabs.setCurrentWidget(self._focus_tab)
-        self._focus_tab.design_current_card()
-
     def _restyle_deck(self) -> None:
         restyle_whole_deck(self.context, self)
 
@@ -143,15 +161,16 @@ class MainWindow(QMainWindow):
             self._import_deck()
 
     def _build_gallery_dock(self) -> None:
-        dock = QDockWidget("Gallery sources", self)
+        dock = QDockWidget("Gallery folders", self)
         dock.setWidget(GalleryDock(self.context))
         dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
         self.resizeDocks([dock], [360], Qt.Orientation.Horizontal)
         dock.hide()
         toggle = dock.toggleViewAction()
-        toggle.setText("Gallery sources panel")
-        self._toolbar.addAction(toggle)
+        toggle.setText("Gallery folders")
+        toggle.setToolTip("Folders the gallery searches. The Focus tab already shows the pictures in those folders.")
+        self._view_menu.addAction(toggle)
 
     def _connect_session(self) -> None:
         self.context.session.statusMessage.connect(lambda message: self.statusBar().showMessage(message, 6000))
@@ -163,7 +182,8 @@ class MainWindow(QMainWindow):
     def _on_deck_presence_changed(self) -> None:
         has_deck = self.context.session.has_deck()
         self._action_bar.set_deck_open(has_deck)
-        self._artist_action.setEnabled(has_deck)
+        for action in self._deck_actions:
+            action.setEnabled(has_deck)
 
     def _refresh_publish_hint(self) -> None:
         self._action_bar.set_publish_hint(self.context.session.publish_warning())

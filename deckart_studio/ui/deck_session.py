@@ -191,7 +191,7 @@ class DeckSession(QObject):
         if card is None:
             return
         target = self.document.split_commanders([card])
-        self.active_board_index = next(index for index, board in enumerate(self.boards()) if board.container is target.container)
+        self.active_board_index = self._index_of_board(target)
         self._announce_structure_change()
         self._announce_dirty(f"{card.nickname} is now in the {target.name} stack")
 
@@ -203,6 +203,29 @@ class DeckSession(QObject):
         self.document.move_card(card, boards[target_board_index])
         self._announce_structure_change()
         self._announce_dirty(f"Moved {card.nickname} to {boards[target_board_index].name}")
+
+    def move_card_to_new_board(self, index: int, name: str) -> None:
+        """Create a stack and move this card into it, then show that stack."""
+        card = self.card(index)
+        if card is None or self.document is None or not name.strip():
+            return
+        target = self.document.add_board(name.strip())
+        self.document.move_card(card, target)
+        self.active_board_index = self._index_of_board(target)
+        self._announce_structure_change()
+        self._announce_dirty(f"Moved {card.nickname} to {name.strip()}")
+
+    def duplicate_card(self, index: int) -> None:
+        card = self.card(index)
+        board = self.active_board()
+        if card is None or board is None or self.document is None:
+            return
+        self.document.duplicate_card(card, board)
+        self._announce_structure_change()
+        self._announce_dirty(f"Added another copy of {card.nickname}")
+
+    def _index_of_board(self, target: Board) -> int:
+        return next(index for index, board in enumerate(self.boards()) if board.container is target.container)
 
     def assign_face(self, index: int, source: ImageSource) -> None:
         card = self.card(index)
