@@ -51,7 +51,7 @@ class SelfTest:
 
     def __init__(self, online: bool):
         self.online = online
-        self.workspace = Path(tempfile.mkdtemp(prefix="deckart_selftest_"))
+        self.workspace = Path(tempfile.mkdtemp(prefix="deckart_selftest_")).resolve()
         os.environ["DECKART_STUDIO_DATA"] = str(self.workspace / "data")
         self.application = QApplication.instance() or QApplication(sys.argv)
         self.settings = self._isolated_settings()
@@ -117,7 +117,7 @@ class SelfTest:
     def check_settings_round_trip(self) -> str:
         reloaded = AppSettings.load()
         assert reloaded.deck_art_folder == self.settings.deck_art_folder, "deck_art_folder did not persist"
-        assert str(self.settings.deck_art_root()) in reloaded.gallery_folders, "DeckArt root not a gallery source"
+        assert str(self.settings.deck_art_root().resolve()) in reloaded.gallery_folders, "DeckArt root not a gallery source"
         assert (self.settings.deck_art_root() / "README.txt").exists(), "DeckArt README not created"
         assert self.settings.generated_ai_folder().is_dir(), "generated_ai folder was not created"
         assert reloaded.art_styles, "default art styles were not saved"
@@ -164,7 +164,7 @@ class SelfTest:
         document.save()
         assert any(backup_directory().glob("selftest-deck-*.json")), "no backup written"
         reloaded = DeckDocument.load(self.deck_path)
-        assert reloaded.cards()[1].face_source().local_path == self.workspace / "art.png", "face edit did not persist"
+        assert reloaded.cards()[1].face_source().local_path.resolve() == (self.workspace / "art.png").resolve(), "face edit did not persist"
         return "2 stacks / 5 cards, face edit + backup verified"
 
     def check_stack_editing(self) -> str:
@@ -214,7 +214,7 @@ class SelfTest:
     def check_publish_url_rewrite(self) -> str:
         document = DeckDocument.load(self.deck_path)
         local_paths = document.local_image_paths()
-        assert local_paths == [self.workspace / "art.png"], f"unexpected local images: {local_paths}"
+        assert [path.resolve() for path in local_paths] == [(self.workspace / "art.png").resolve()], f"unexpected local images: {local_paths}"
         replaced = document.replace_image_urls({local_path_to_url(local_paths[0]): "https://example.invalid/cloud.jpg"})
         assert replaced >= 1 and not document.local_image_paths(), "file:// URL was not rewritten"
         payload, suffix = prepare_payload(local_paths[0])
